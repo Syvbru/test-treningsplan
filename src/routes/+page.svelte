@@ -35,6 +35,7 @@
         ChevronUp,
         Users,
         Video,
+        ArrowLeft,
     } from "lucide-svelte";
 
 
@@ -674,22 +675,38 @@
 
     // Hamburgermeny state
     let menuOpen = false;
+    let showStyrkeSubmenu = false;
 
-    // PDF-lenker - tilpass disse til dine egne filer
-    const pdfLinks = [
-        { title: "Styrke m/vekter", url: "/pdf/StyrkeMedVekter.pdf" },
-        { title: "Styrke u/vekter", url: "/pdf/StyrkeUtenVekter.pdf" },
+    // PDF-lenker
+    const intensitetssoner = { title: "Intensitetssoner", url: "/pdf/Intensitessoner.pdf" };
+    
+    const styrkeProgrammer = [
+        { title: "Styrke med vekter", url: "/pdf/StyrkeMedVekter.pdf" },
+        { title: "Styrke uten vekter", url: "/pdf/StyrkeUtenVekter.pdf" },
         { title: "Styrke vinter", url: "/pdf/StyrkeVinter.pdf" },
-        { title: "Intensitetssoner", url: "/pdf/Intensitessoner.pdf" },
+        { title: "Kort styrkeøkt overkropp", url: "/pdf/KortStyrkeøktOverkropp.pdf" },
+        { title: "Kort styrkeøkt ben", url: "/pdf/KortStyrkeøktBen.pdf" },
     ];
 
     function toggleMenu() {
         menuOpen = !menuOpen;
+        if (!menuOpen) {
+            showStyrkeSubmenu = false;
+        }
     }
 
     function openPdf(url: string) {
         window.open(url, '_blank');
         menuOpen = false;
+        showStyrkeSubmenu = false;
+    }
+
+    function showStyrkeMenu() {
+        showStyrkeSubmenu = true;
+    }
+
+    function backToMainMenu() {
+        showStyrkeSubmenu = false;
     }
 </script>
 
@@ -822,37 +839,77 @@
                     <!-- Dropdown meny -->
                     {#if menuOpen}
                         <div class="absolute top-full right-0 mt-2 bg-white rounded-xl shadow-2xl border border-violet-200 min-w-[250px] z-50 overflow-hidden">
-                            <div class="py-2">
-                                <div class="px-4 py-2 text-sm font-semibold text-violet-700 border-b border-violet-100">
-                                    Dokumenter
-                                </div>
-                                {#if currentEditPlanSheet}
+                            {#if !showStyrkeSubmenu}
+                                <!-- Hovedmeny -->
+                                <div class="py-2">
+                                    <div class="px-4 py-2 text-sm font-semibold text-violet-700 border-b border-violet-100">
+                                        Dokumenter
+                                    </div>
+                                    
+                                    {#if currentEditPlanSheet}
+                                        <button
+                                            on:click={() => {
+                                                window.open(currentEditPlanSheet, '_blank');
+                                                menuOpen = false;
+                                            }}
+                                            class="w-full text-left px-4 py-3 hover:bg-violet-50 transition-colors text-slate-700 font-medium flex items-center gap-2 border-b border-violet-100"
+                                        >
+                                            <svg class="h-5 w-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                            </svg>
+                                            {isAdmin && currentUtoverNavn ? `${currentUtoverNavn} treningsplan (Rediger)` : 'Min treningsplan (Rediger)'}
+                                        </button>
+                                    {/if}
+
                                     <button
-                                        on:click={() => {
-                                            window.open(currentEditPlanSheet, '_blank');
-                                            menuOpen = false;
-                                        }}
+                                        on:click={showStyrkeMenu}
                                         class="w-full text-left px-4 py-3 hover:bg-violet-50 transition-colors text-slate-700 font-medium flex items-center gap-2 border-b border-violet-100"
                                     >
-                                        <svg class="h-5 w-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-                                        </svg>
-                                        {isAdmin && currentUtoverNavn ? `${currentUtoverNavn} treningsplan (Rediger)` : 'Min treningsplan (Rediger)'}
+                                        <Dumbbell class="h-5 w-5 text-violet-600" />
+                                        Styrkeøkter
+                                        <ChevronRight class="h-4 w-4 ml-auto text-slate-400" />
                                     </button>
-                                {/if}
 
-                                {#each pdfLinks as link}
                                     <button
-                                        on:click={() => openPdf(link.url)}
+                                        on:click={() => openPdf(intensitetssoner.url)}
                                         class="w-full text-left px-4 py-3 hover:bg-violet-50 transition-colors text-slate-700 font-medium flex items-center gap-2"
                                     >
                                         <svg class="h-5 w-5 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
                                         </svg>
-                                        {link.title}
+                                        Intensitetssoner
                                     </button>
-                                {/each}
-                            </div>
+                                </div>
+                            {:else}
+                                <!-- Styrkeøkter undermeny -->
+                                <div class="py-2">
+                                    <div class="flex items-center px-4 py-2 border-b border-violet-100">
+                                        <button
+                                            on:click={backToMainMenu}
+                                            class="flex items-center gap-2 text-violet-700 hover:text-violet-800 transition-colors"
+                                        >
+                                            <ArrowLeft class="h-4 w-4" />
+                                            <span class="text-sm font-semibold">Tilbake</span>
+                                        </button>
+                                    </div>
+
+                                    <div class="px-4 py-2 text-sm font-semibold text-violet-700 border-b border-violet-100">
+                                        Styrkeøkter
+                                    </div>
+
+                                    {#each styrkeProgrammer as program}
+                                        <button
+                                            on:click={() => openPdf(program.url)}
+                                            class="w-full text-left px-4 py-3 hover:bg-violet-50 transition-colors text-slate-700 font-medium flex items-center gap-2"
+                                        >
+                                            <svg class="h-5 w-5 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                                            </svg>
+                                            {program.title}
+                                        </button>
+                                    {/each}
+                                </div>
+                            {/if}
                         </div>
                     {/if}
                 </div>
