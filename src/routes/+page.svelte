@@ -451,7 +451,14 @@
             lower.includes("sprint") || 
             lower.includes("sprintøkt") ||
             lower.includes("distanseøkt");
-        const isRace = /(rennet|renn(?!forbered))/u.test(lower);
+        const isRace = 
+            /(rennet|renn(?!forbered))/u.test(lower) ||
+            lower.includes("dsv-cup") ||
+            lower.includes("km ") ||
+            lower.includes(" km")||
+            lower.includes("birken")||
+            lower.includes("skifestival");
+
         if (isHardKeyword || isRace) {
             return {
                 icon: Timer,
@@ -792,13 +799,9 @@
                     </svg>
                     Logger inn...
                 {:else}
-                    Vis min plan
+                    Logg inn
                 {/if}
             </button>
-
-            <p class="mt-6 text-center text-xs text-gray-500">
-                Treningsdata lastes inn fra en anonymisert fil.
-            </p>
         </div>
     </div>
 {/if}
@@ -1543,7 +1546,7 @@
                                         Diagonal
                                             <ChevronDown class="h-5 w-5 stroke-[2.5] transition-transform group-open/sub:rotate-180 duration-700 ease-out" />
                                     </summary>
-                                        <div class="p-1 sm:p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div class="p-1 sm:p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div
                                             class="bg-white rounded-xl shadow overflow-hidden"
                                         >
@@ -1584,7 +1587,7 @@
                                         Staking
                                             <ChevronDown class="h-5 w-5 stroke-[2.5] transition-transform group-open/sub:rotate-180 duration-700 ease-out" />
                                     </summary>
-                                        <div class="p-1 sm:p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div class="p-1 sm:p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div
                                             class="bg-white rounded-xl shadow overflow-hidden"
                                         >
@@ -1625,7 +1628,7 @@
                                         Dobbeltak med fraspark
                                             <ChevronDown class="h-5 w-5 stroke-[2.5] transition-transform group-open/sub:rotate-180 duration-700 ease-out" />
                                     </summary>
-                                        <div class="p-1 sm:p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div class="p-1 sm:p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div
                                             class="bg-white rounded-xl shadow overflow-hidden"
                                         >
@@ -1666,7 +1669,7 @@
                                         Dobbeldans
                                             <ChevronDown class="h-5 w-5 stroke-[2.5] transition-transform group-open/sub:rotate-180 duration-700 ease-out" />
                                     </summary>
-                                        <div class="p-1 sm:p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div class="p-1 sm:p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div
                                             class="bg-white rounded-xl shadow overflow-hidden"
                                         >
@@ -1707,7 +1710,7 @@
                                         Padling
                                             <ChevronDown class="h-5 w-5 stroke-[2.5] transition-transform group-open/sub:rotate-180 duration-700 ease-out" />
                                     </summary>
-                                        <div class="p-1 sm:p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div class="p-1 sm:p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div
                                             class="bg-white rounded-xl shadow overflow-hidden"
                                         >
@@ -1748,7 +1751,7 @@
                                         Enkeldans
                                             <ChevronDown class="h-5 w-5 stroke-[2.5] transition-transform group-open/sub:rotate-180 duration-700 ease-out" />
                                     </summary>
-                                        <div class="p-1 sm:p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div class="p-1 sm:p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div
                                             class="bg-white rounded-xl shadow overflow-hidden"
                                         >
