@@ -15,11 +15,20 @@
         isSameDay,
         parseISO,
         isWithinInterval,
+        startOfWeek,
+        endOfWeek,
+        startOfYear,
+        endOfYear,
+        addWeeks,
+        subWeeks,
+        addYears,
+        subYears,
     } from "date-fns";
     import { nb } from "date-fns/locale";
     import {
         Calendar,
         LineChart,
+        NotepadText,
         ChevronLeft,
         ChevronRight,
         Clock,
@@ -408,9 +417,17 @@
         OVERVIEW: "overview",
         CALENDAR: "calendar",
         TECHNIQUE: "technique",
+        STATISTICS: "statistics",
     } as const;
+
     type View = (typeof VIEWS)[keyof typeof VIEWS];
     let view: View = VIEWS.OVERVIEW;
+    // Statistikk state
+    let statsPeriod: "week" | "month" | "year" = "month";
+    let statsStartDate = startOfMonth(new Date());
+    let showStatsCalendar = false;
+    let statsCalendarCursor = new Date();
+    let statsCalendarDays: (Date | null)[] = [];
 
     let workouts: Workout[] = [];
     let today = startOfDay(new Date());
@@ -457,6 +474,7 @@
             lower.includes("km ") ||
             lower.includes(" km")||
             lower.includes("birken")||
+            lower.includes("klubbmesterskap") ||
             lower.includes("skifestival");
 
         if (isHardKeyword || isRace) {
@@ -596,7 +614,9 @@
     }
 
     function endOfDayIncl(d: Date) {
-        return addDays(startOfDay(d), 1);
+        const endOfDay = new Date(d);
+        endOfDay.setHours(23, 59, 59, 999);
+        return endOfDay;
     }
 
     // Dato-logikk
@@ -714,6 +734,180 @@
 
     function backToMainMenu() {
         showStyrkeSubmenu = false;
+    }
+
+    // Statistikkfunksjoner
+    function getPeriodDates(period: typeof statsPeriod, startDate: Date) {
+        switch (period) {
+            case "week":
+                return {
+                    start: startOfWeek(startDate, { weekStartsOn: 1 }),
+                    end: endOfWeek(startDate, { weekStartsOn: 1 })
+                };
+            case "month":
+                return {
+                    start: startOfMonth(startDate),
+                    end: endOfMonth(startDate)
+                };
+            case "year":
+                const currentYear = startDate.getFullYear();
+                const isAfterMay = startDate.getMonth() >= 4; // Mai er index 4
+                const seasonStartYear = isAfterMay ? currentYear : currentYear - 1;
+                
+                return {
+                    start: new Date(seasonStartYear, 4, 1), // 1. mai
+                    end: new Date(seasonStartYear + 1, 3, 30, 23, 59, 59) // 30. april neste år
+                };
+        }
+    }
+
+    function changePeriod(direction: "next" | "prev") {
+        switch (statsPeriod) {
+            case "week":
+                statsStartDate = direction === "next" 
+                    ? addWeeks(statsStartDate, 1) 
+                    : subWeeks(statsStartDate, 1);
+                break;
+            case "month":
+                statsStartDate = direction === "next" 
+                    ? addMonths(statsStartDate, 1) 
+                    : subMonths(statsStartDate, 1);
+                break;
+            case "year":
+                statsStartDate = direction === "next" 
+                    ? addYears(statsStartDate, 1) 
+                    : subYears(statsStartDate, 1);
+                break;
+        }
+    }
+
+    function getPeriodLabel(period: typeof statsPeriod, startDate: Date): string {
+        switch (period) {
+            case "week":
+                const weekStart = startOfWeek(startDate, { weekStartsOn: 1 });
+                const weekEnd = endOfWeek(startDate, { weekStartsOn: 1 });
+                return `Uke ${format(weekStart, "w, yyyy", { locale: nb })}`;
+            case "month":
+                return format(startDate, "MMMM yyyy", { locale: nb });
+            case "year":
+                const currentYear = startDate.getFullYear();
+                const isAfterMay = startDate.getMonth() >= 4;
+                const startYear = isAfterMay ? currentYear : currentYear - 1;
+                return `${startYear}/${startYear + 1}`;
+        }
+    }
+
+    $: periodDates = getPeriodDates(statsPeriod, statsStartDate);
+    $: periodWorkouts = workouts.filter((w) => {
+        const d = parseISO(w.date);
+        return isWithinInterval(d, {
+            start: startOfDay(periodDates.start),
+            end: endOfDayIncl(periodDates.end),
+        });
+    });
+
+    $: stats = (() => {
+        let hardOkter = 0;
+        let langtur = 0;
+        let styrke = 0;
+        let hvile = 0;
+        let totalMinutes = 0;
+
+        periodWorkouts.forEach((w) => {
+            const lower = w.title.toLowerCase();
+            
+            // Kategorisering
+            if (lower.includes("hvile")) {
+                hvile++;
+            } else if (lower.includes("styrke")) {
+                styrke++;
+            } else if (lower.includes("langtur")) {
+                langtur++;
+            } else {
+                // Sjekk om det er hardøkt
+                const isHard = lower.includes("intervall") ||
+                    lower.includes("motbakkeløp") ||
+                    lower.includes("sprint") ||
+                    lower.includes("sprintøkt") ||
+                    lower.includes("distanseøkt") ||
+                    /(rennet|renn(?!forbered))/u.test(lower) ||
+                    lower.includes("dsv-cup") ||
+                    lower.includes("km ") ||
+                    lower.includes(" km") ||
+                    lower.includes("birken") ||
+                    lower.includes("klubbmesterskap") ||
+                    lower.includes("skifestival");
+                
+                if (isHard) {
+                    hardOkter++;
+                }
+            }
+            
+            if (w.durationMin) {
+                totalMinutes += w.durationMin;
+            }
+        });
+
+        const totalHours = Math.floor(totalMinutes / 60);
+        const totalMins = totalMinutes % 60;
+
+        return {
+            hardOkter,
+            langtur,
+            styrke,
+            hvile,
+            totalEconomic: periodWorkouts.length - hvile, // Alle økter unntatt hvile
+            totalHours,
+            totalMins,
+            totalMinutes
+        };
+    })();    
+
+    // Kalenderdialog-funksjoner
+    function openStatsCalendar() {
+        showStatsCalendar = true;
+        statsCalendarCursor = statsStartDate;
+        updateStatsCalendarDays();
+    }
+
+    function closeStatsCalendar() {
+        showStatsCalendar = false;
+    }
+
+    function updateStatsCalendarDays() {
+        const monthStart = startOfMonth(statsCalendarCursor);
+        const monthEnd = endOfMonth(statsCalendarCursor);
+        const startWeekday = (getDay(monthStart) + 6) % 7;
+        const totalDays = monthEnd.getDate();
+
+        statsCalendarDays = [];
+        for (let i = 0; i < startWeekday; i++) statsCalendarDays.push(null);
+        for (let d = 0; d < totalDays; d++) statsCalendarDays.push(addDays(monthStart, d));
+    }
+
+    function changeStatsCalendarMonth(dir: "next" | "prev") {
+        statsCalendarCursor = dir === "next" 
+            ? addMonths(statsCalendarCursor, 1) 
+            : subMonths(statsCalendarCursor, 1);
+        updateStatsCalendarDays();
+    }
+
+    function selectStatsDate(date: Date) {
+        if (statsPeriod === "week") {
+            statsStartDate = startOfWeek(date, { weekStartsOn: 1 });
+        } else if (statsPeriod === "month") {
+            statsStartDate = startOfMonth(date);
+        } else {
+            const isAfterMay = date.getMonth() >= 4;
+            const seasonStartYear = isAfterMay ? date.getFullYear() : date.getFullYear() - 1;
+            statsStartDate = new Date(seasonStartYear, 4, 1);
+        }
+        closeStatsCalendar();
+    }
+
+    // Oppdater kalenderdager når cursor endres
+    $: if (showStatsCalendar) {
+        updateStatsCalendarDays();
     }
 </script>
 
@@ -846,7 +1040,7 @@
                                 <!-- Hovedmeny -->
                                 <div class="py-2">
                                     <div class="px-4 py-2 text-sm font-semibold text-violet-700 border-b border-violet-100">
-                                        Dokumenter
+                                        Meny
                                     </div>
                                     
                                     {#if currentEditPlanSheet}
@@ -863,6 +1057,17 @@
                                             {isAdmin && currentUtoverNavn ? `${currentUtoverNavn} treningsplan (Rediger)` : 'Min treningsplan (Rediger)'}
                                         </button>
                                     {/if}
+                                    
+                                    <button
+                                        on:click={() => {
+                                            view = VIEWS.TECHNIQUE;
+                                            menuOpen = false;
+                                        }}
+                                        class="w-full text-left px-4 py-3 hover:bg-violet-50 transition-colors text-slate-700 font-medium flex items-center gap-2 border-b border-violet-100"
+                                    >
+                                        <Video class="h-5 w-5 text-violet-600" />
+                                        Teknikkvideoer
+                                    </button>
 
                                     <button
                                         on:click={showStyrkeMenu}
@@ -997,7 +1202,7 @@
                             class="relative flex bg-white/15 rounded-full w-full sm:w-[345px]"
                             style="padding: 0.175rem;">
                             <div
-                                class="absolute bg-white rounded-full shadow-md transition-all duration-[700ms]"
+                                class="absolute rounded-full transition-all {view === VIEWS.TECHNIQUE ? 'bg-transparent' : 'duration-[700ms] bg-white shadow-md'}"
                                 style={`top: 0.175rem; left: 0.175rem; height: calc(100% - 0.35rem); width: calc(33.333% - 0.38rem); transform: translateX(${
                                     view === VIEWS.OVERVIEW
                                         ? "0"
@@ -1015,7 +1220,7 @@
                                         : "text-white/80 hover:text-white"
                                 }`}
                             >
-                                <LineChart class="h-4 w-4 mr-1" /> Oversikt
+                                <NotepadText class="h-4 w-4 mr-1" /> Plan
                             </button>
                             <button
                                 on:click={() => (view = VIEWS.CALENDAR)}
@@ -1028,14 +1233,14 @@
                                 <Calendar class="h-4 w-4 mr-1" /> Kalender
                             </button>
                             <button
-                                on:click={() => (view = VIEWS.TECHNIQUE)}
+                                on:click={() => (view = VIEWS.STATISTICS)}
                                 class={`relative z-10 w-1/3 py-2 text-sm font-medium flex items-center justify-center transition-colors ${
-                                    view === VIEWS.TECHNIQUE
+                                    view === VIEWS.STATISTICS
                                         ? "text-violet-600"
                                         : "text-white/80 hover:text-white"
                                 }`}
                                 >
-                                    <Video class="h-4 w-4 mr-1" /> Teknikk
+                                    <LineChart class="h-4 w-4 mr-1" /> Statistikk
                             </button>
                         </div>
                     </div>
@@ -1542,7 +1747,7 @@
                             <div class="px-1 sm:px-6 pb-6 space-y-4">
                                 <!-- Diagonal -->
                                 <details class="group/sub bg-white rounded-2xl mt-4 overflow-hidden">
-                                    <summary class="cursor-pointer px-2 sm:px-4 py-3 text-lg font-semibold text-violet-700 hover:bg-violet-50 group-open/sub:bg-violet-50 transition-colors flex items-center gap-2 rounded-xl">
+                                    <summary class="cursor-pointer px-2 sm:px-4 py-3 text-lg font-semibold text-violet-700 hover:bg-violet-50 group-open/sub:border-b-violet-500 group-open/sub:border-b-2 transition-colors flex items-center gap-2 rounded-sm">
                                         Diagonal
                                             <ChevronDown class="h-5 w-5 stroke-[2.5] transition-transform group-open/sub:rotate-180 duration-700 ease-out" />
                                     </summary>
@@ -1583,7 +1788,7 @@
 
                                 <!-- Staking -->
                                 <details class="group/sub bg-white rounded-2xl overflow-hidden">
-                                    <summary class="cursor-pointer px-2 sm:px-4 py-3 text-lg font-semibold text-violet-700 hover:bg-violet-50 group-open/sub:bg-violet-50 transition-colors flex items-center gap-2 rounded-xl">
+                                    <summary class="cursor-pointer px-2 sm:px-4 py-3 text-lg font-semibold text-violet-700 hover:bg-violet-50 group-open/sub:border-b-violet-500 group-open/sub:border-b-2 transition-colors flex items-center gap-2 rounded-sm">
                                         Staking
                                             <ChevronDown class="h-5 w-5 stroke-[2.5] transition-transform group-open/sub:rotate-180 duration-700 ease-out" />
                                     </summary>
@@ -1624,7 +1829,7 @@
 
                                 <!-- Dobbeltak med fraspark -->
                                 <details class="group/sub bg-white rounded-2xl overflow-hidden">
-                                    <summary class="cursor-pointer px-2 sm:px-4 py-3 text-lg font-semibold text-violet-700 hover:bg-violet-50 group-open/sub:bg-violet-50 transition-colors flex items-center gap-2 rounded-xl">
+                                    <summary class="cursor-pointer px-2 sm:px-4 py-3 text-lg font-semibold text-violet-700 hover:bg-violet-50 group-open/sub:border-b-violet-500 group-open/sub:border-b-2 transition-colors flex items-center gap-2 rounded-sm">
                                         Dobbeltak med fraspark
                                             <ChevronDown class="h-5 w-5 stroke-[2.5] transition-transform group-open/sub:rotate-180 duration-700 ease-out" />
                                     </summary>
@@ -1665,7 +1870,7 @@
                             <div class="0 sm:px-6 pb-6 space-y-4">
                                 <!-- Dobbeldans -->
                                 <details class="group/sub bg-white rounded-2xl mt-4 overflow-hidden">
-                                    <summary class="cursor-pointer px-2 sm:px-4 py-3 text-lg font-semibold text-violet-700 hover:bg-violet-50 group-open/sub:bg-violet-50 transition-colors flex items-center gap-2 rounded-xl">
+                                    <summary class="cursor-pointer px-2 sm:px-4 py-3 text-lg font-semibold text-violet-700 hover:bg-violet-50 group-open/sub:border-b-violet-500 group-open/sub:border-b-2 transition-colors flex items-center gap-2 rounded-sm">
                                         Dobbeldans
                                             <ChevronDown class="h-5 w-5 stroke-[2.5] transition-transform group-open/sub:rotate-180 duration-700 ease-out" />
                                     </summary>
@@ -1706,7 +1911,7 @@
 
                                 <!-- Padling -->
                                 <details class="group/sub bg-white rounded-2xl overflow-hidden">
-                                    <summary class="cursor-pointer px-2 sm:px-4 py-3 text-lg font-semibold text-violet-700 hover:bg-violet-50 group-open/sub:bg-violet-50 transition-colors flex items-center gap-2 rounded-xl">
+                                    <summary class="cursor-pointer px-2 sm:px-4 py-3 text-lg font-semibold text-violet-700 hover:bg-violet-50 group-open/sub:border-b-violet-500 group-open/sub:border-b-2 transition-colors flex items-center gap-2 rounded-sm">
                                         Padling
                                             <ChevronDown class="h-5 w-5 stroke-[2.5] transition-transform group-open/sub:rotate-180 duration-700 ease-out" />
                                     </summary>
@@ -1747,7 +1952,7 @@
 
                                 <!-- Enkeldans -->
                                 <details class="group/sub bg-white rounded-2xl overflow-hidden">
-                                    <summary class="cursor-pointer px-2 sm:px-4 py-3 text-lg font-semibold text-violet-700 hover:bg-violet-50 group-open/sub:bg-violet-50 transition-colors flex items-center gap-2 rounded-xl">
+                                    <summary class="cursor-pointer px-2 sm:px-4 py-3 text-lg font-semibold text-violet-700 hover:bg-violet-50 group-open/sub:border-b-violet-500 group-open/sub:border-b-2 transition-colors flex items-center gap-2 rounded-sm">
                                         Enkeldans
                                             <ChevronDown class="h-5 w-5 stroke-[2.5] transition-transform group-open/sub:rotate-180 duration-700 ease-out" />
                                     </summary>
@@ -1789,6 +1994,340 @@
                         </details>
                     </div>
                 </div>
+            {/if}
+
+            {#if view === VIEWS.STATISTICS}
+                <div class="mt-8 mb-12 mx-auto max-w-4xl">
+                    <h2 class="mb-6 text-3xl font-bold text-center text-violet-700">
+                        Treningsstatistikk
+                    </h2>
+
+                    <!-- Periode-velger -->
+                    <div class="mb-6 flex flex-col sm:flex-row gap-4 items-stretch sm:items-center justify-between">
+                        <!-- Periode-type velger -->
+                        <div class="relative flex bg-slate-200 rounded-full w-full md:w-[300px]" style="padding: 0.175rem;">
+                            <div
+                                class="absolute bg-violet-600 rounded-full shadow-sm transition-all duration-500"
+                                style={`top: 0.175rem; left: 0.175rem; height: calc(100% - 0.35rem); width: calc(33.333% - 0.38rem); transform: translateX(${
+                                    statsPeriod === "week" ? "0" :
+                                    statsPeriod === "month" ? "calc(100% + 0.35rem)" :
+                                    "calc(200% + 0.7rem)"
+                                });`}
+                            ></div>
+
+                            <button
+                                on:click={() => statsPeriod = "week"}
+                                class={`relative z-10 w-1/3 text-sm font-medium py-2 px-4 transition-colors ${
+                                    statsPeriod === "week" ? "text-white" : "text-slate-700 hover:text-violet-700"
+                                }`}
+                            >
+                                Uke
+                            </button>
+                            <button
+                                on:click={() => statsPeriod = "month"}
+                                class={`relative z-10 w-1/3 text-sm font-medium py-2 px-4 transition-colors ${
+                                    statsPeriod === "month" ? "text-white" : "text-slate-700 hover:text-violet-700"
+                                }`}
+                            >
+                                Måned
+                            </button>
+                            <button
+                                on:click={() => statsPeriod = "year"}
+                                class={`relative z-10 w-1/3 text-sm font-medium py-2 px-4 transition-colors ${
+                                    statsPeriod === "year" ? "text-white" : "text-slate-700 hover:text-violet-700"
+                                }`}
+                            >
+                                Sesong
+                            </button>
+                        </div>
+
+                        <!-- Navigering -->
+                        <div class="flex items-center gap-2 justify-center sm:justify-end">
+                            <button
+                                on:click={() => changePeriod("prev")}
+                                class="border border-slate-300 rounded-xl p-2 hover:bg-slate-50 transition-colors"
+                                aria-label="Forrige periode"
+                            >
+                                <ChevronLeft class="h-5 w-5" />
+                            </button>
+                            
+                            <div class="min-w-[200px] text-center">
+                                <p class="text-lg font-semibold text-slate-800">
+                                    {getPeriodLabel(statsPeriod, statsStartDate)}
+                                </p>
+                            </div>
+
+                            <button
+                                on:click={() => changePeriod("next")}
+                                class="border border-slate-300 rounded-xl p-2 hover:bg-slate-50 transition-colors"
+                                aria-label="Neste periode"
+                            >
+                                <ChevronRight class="h-5 w-5" />
+                            </button>
+
+                            <!-- LEGG TIL KALENDERKNAPP -->
+                            <button
+                                on:click={openStatsCalendar}
+                                class="border border-violet-300 bg-violet-50 rounded-xl p-2 hover:bg-violet-100 transition-colors"
+                                aria-label="Velg dato"
+                            >
+                                <Calendar class="h-5 w-5 text-violet-600" />
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Statistikk-kort -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                        <!-- Hardøkter -->
+                        <div class="bg-white rounded-2xl border-2 border-red-200 p-6 shadow-sm">
+                            <div class="flex items-center gap-3 mb-2">
+                                <div class="bg-red-100 rounded-xl p-3">
+                                    <Timer class="h-6 w-6 text-red-700" />
+                                </div>
+                                <div>
+                                    <p class="text-3xl font-bold text-red-700">{stats.hardOkter}</p>
+                                    <p class="text-sm text-slate-600">Hardøkter</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Langturer -->
+                        <div class="bg-white rounded-2xl border-2 border-cyan-200 p-6 shadow-sm">
+                            <div class="flex items-center gap-3 mb-2">
+                                <div class="bg-cyan-100 rounded-xl p-3">
+                                    <Heart class="h-6 w-6 text-cyan-800" />
+                                </div>
+                                <div>
+                                    <p class="text-3xl font-bold text-cyan-800">{stats.langtur}</p>
+                                    <p class="text-sm text-slate-600">Langturer</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Styrkeøkter -->
+                        <div class="bg-white rounded-2xl border-2 border-yellow-200 p-6 shadow-sm">
+                            <div class="flex items-center gap-3 mb-2">
+                                <div class="bg-yellow-100 rounded-xl p-3">
+                                    <Dumbbell class="h-6 w-6 text-yellow-800" />
+                                </div>
+                                <div>
+                                    <p class="text-3xl font-bold text-yellow-800">{stats.styrke}</p>
+                                    <p class="text-sm text-slate-600">Styrkeøkter</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Hviledager -->
+                        <div class="bg-white rounded-2xl border-2 border-green-200 p-6 shadow-sm">
+                            <div class="flex items-center gap-3 mb-2">
+                                <div class="bg-green-100 rounded-xl p-3">
+                                    <BatteryCharging class="h-6 w-6 text-green-800" />
+                                </div>
+                                <div>
+                                    <p class="text-3xl font-bold text-green-800">{stats.hvile}</p>
+                                    <p class="text-sm text-slate-600">Hviledager</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Totalt antall økter -->
+                        <div class="bg-white rounded-2xl border-2 border-violet-200 p-6 shadow-sm">
+                            <div class="flex items-center gap-3 mb-2">
+                                <div class="bg-violet-100 rounded-xl p-3">
+                                    <Calendar class="h-6 w-6 text-violet-700" />
+                                </div>
+                                <div>
+                                    <p class="text-3xl font-bold text-violet-700">{stats.totalEconomic}</p>
+                                    <p class="text-sm text-slate-600">Totalt økter</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Total treningstid -->
+                        <div class="bg-white rounded-2xl border-2 border-violet-200 p-6 shadow-sm">
+                            <div class="flex items-center gap-3 mb-2">
+                                <div class="bg-violet-100 rounded-xl p-3">
+                                    <Clock class="h-6 w-6 text-violet-700" />
+                                </div>
+                                <div>
+                                    <p class="text-3xl font-bold text-violet-700">
+                                        {stats.totalHours}t {#if stats.totalMins > 0} {stats.totalMins.toString().padStart(2, '0')}min {/if}
+                                    </p>
+                                    <p class="text-sm text-slate-600">Timer totalt</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Detaljert liste over økter i perioden -->
+                    <div class="bg-white rounded-2xl border border-slate-200 p-3 shadow-sm">
+                        <h3 class="text-xl font-bold text-slate-800 mb-4">
+                            Økter i perioden
+                        </h3>
+                        
+                        {#if periodWorkouts.length === 0}
+                            <p class="text-slate-600 italic">Ingen økter registrert i denne perioden.</p>
+                        {:else}
+                            <div class="space-y-2 max-h-96 overflow-y-auto">
+                                {#each groupByDate(periodWorkouts.sort((a, b) => a.date.localeCompare(b.date))) as g}
+                                    <div class="border border-slate-200 rounded-xl p-3">
+                                        <p class="text-sm md:text-lg font-semibold text-slate-700 mb-2">
+                                            {format(parseISO(g.date), "EEEE d. MMMM", { locale: nb })}
+                                        </p>
+                                        <div class="space-y-1">
+                                            {#each g.sessions as s}
+                                                {@const info = getWorkoutInfo(s.title)}
+                                                <div class="flex items-center gap-2 text-xs md:text-sm">
+                                                    <div class={`px-2 py-1 rounded-lg ${info.color} font-medium flex items-center gap-1`}>
+                                                        <svelte:component this={info.icon} class="h-4 w-4" />
+                                                        {s.title}
+                                                    </div>
+                                                    {#if s.durationMin}
+                                                    <Clock class="text-slate-500 h-4 w-4" />
+                                                    <span class="text-slate-600">
+                                                            {formatTime(s.durationMin)}
+                                                    </span>
+                                                    {/if}
+                                                </div>
+                                            {/each}
+                                        </div>
+                                    </div>
+                                {/each}
+                            </div>
+                        {/if}
+                    </div>
+                </div>
+                <!-- Kalenderdialog -->
+                {#if showStatsCalendar}
+                    <div 
+                        class="fixed bg-white/80 inset-0 z-50 flex items-center justify-center p-4"
+                        on:click={closeStatsCalendar}
+                        on:keydown={(e) => e.key === 'Escape' && closeStatsCalendar()}
+                        role="button"
+                        tabindex="0"
+                    >
+                        <div 
+                            class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6"
+                            on:click|stopPropagation
+                            role="dialog"
+                            aria-modal="true"
+                        >
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="text-xl font-bold text-slate-800">
+                                    Velg {statsPeriod === "week" ? "uke" : statsPeriod === "month" ? "måned" : "sesong"}
+                                </h3>
+                                <button
+                                    on:click={closeStatsCalendar}
+                                    class="text-slate-400 hover:text-slate-600 transition-colors"
+                                    aria-label="Lukk"
+                                >
+                                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                    </svg>
+                                </button>
+                            </div>
+
+                            <!-- Kalenderhode -->
+                            <div class="flex justify-between items-center mb-4">
+                                <button
+                                    on:click={() => changeStatsCalendarMonth("prev")}
+                                    class="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                                    aria-label="Forrige måned"
+                                >
+                                    <ChevronLeft class="h-5 w-5" />
+                                </button>
+                                
+                                <h4 class="text-lg font-semibold text-slate-800">
+                                    {format(statsCalendarCursor, "MMMM yyyy", { locale: nb })}
+                                </h4>
+
+                                <button
+                                    on:click={() => changeStatsCalendarMonth("next")}
+                                    class="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                                    aria-label="Neste måned"
+                                >
+                                    <ChevronRight class="h-5 w-5" />
+                                </button>
+                            </div>
+
+                            <!-- Ukedager -->
+                            <div class="grid grid-cols-7 gap-1 mb-2">
+                                {#each ["Ma", "Ti", "On", "To", "Fr", "Lø", "Sø"] as day}
+                                    <div class="text-center text-xs font-semibold text-slate-600 py-2">
+                                        {day}
+                                    </div>
+                                {/each}
+                            </div>
+
+                            <!-- Kalenderdager -->
+                            <div class="grid grid-cols-7 gap-1">
+                                {#each statsCalendarDays as day}
+                                    {#if day}
+                                        {@const isInSelectedPeriod = (() => {
+                                            if (statsPeriod === "week") {
+                                                const weekStart = startOfWeek(statsStartDate, { weekStartsOn: 1 });
+                                                const weekEnd = endOfWeek(statsStartDate, { weekStartsOn: 1 });
+                                                return isWithinInterval(day, { start: weekStart, end: weekEnd });
+                                            } else if (statsPeriod === "month") {
+                                                return isSameDay(startOfMonth(day), startOfMonth(statsStartDate));
+                                            } else {
+                                                // Fjernet ": Date" her for å unngå "Unexpected token"
+                                                const getSeasonStart = (d) => {
+                                                    const year = d.getFullYear();
+                                                    // Hvis vi er i jan-apr (0-3), startet sesongen 1. mai året før
+                                                    return d.getMonth() < 4 ? new Date(year - 1, 4, 1) : new Date(year, 4, 1);
+                                                };
+
+                                                const currentSeasonStart = getSeasonStart(statsStartDate);
+                                                const daySeasonStart = getSeasonStart(day);
+                                                
+                                                return isSameDay(currentSeasonStart, daySeasonStart);
+                                            }
+                                        })()}
+                                        {@const isToday = isSameDay(day, new Date())}
+                                        
+                                        <button
+                                            on:click={() => selectStatsDate(day)}
+                                            class={`
+                                                aspect-square p-2 rounded-lg text-sm transition-all
+                                                ${isInSelectedPeriod 
+                                                    ? 'bg-violet-500 text-white font-semibold shadow-sm' 
+                                                    : isToday
+                                                        ? 'bg-violet-100 text-violet-700 font-semibold'
+                                                        : 'hover:bg-slate-100 text-slate-700'
+                                                }
+                                            `}
+                                        >
+                                            {format(day, "d")}
+                                        </button>
+                                    {:else}
+                                        <div class="aspect-square"></div>
+                                    {/if}
+                                {/each}
+                            </div>
+
+                            <!-- Hurtigvalg -->
+                            <div class="mt-6">
+                                <button
+                                    on:click={() => {
+                                        const now = new Date();
+                                        if (statsPeriod === "week") {
+                                            statsStartDate = startOfWeek(now, { weekStartsOn: 1 });
+                                        } else if (statsPeriod === "month") {
+                                            statsStartDate = startOfMonth(now);
+                                        } else {
+                                            statsStartDate = startOfYear(now);
+                                        }
+                                        closeStatsCalendar();
+                                    }}
+                                    class="w-full px-4 py-2 bg-violet-50 text-violet-500 rounded-lg font-medium hover:bg-violet-200 transition-colors"
+                                >
+                                    {statsPeriod === "week" ? "Nåværende uke" : statsPeriod === "month" ? "Nåværende måned" : "I år"}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                {/if}
             {/if}
         </div>
 
