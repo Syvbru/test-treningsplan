@@ -144,6 +144,13 @@
                         loadWorkoutPlan(data.sheetUrl), 
                         loadFellesOkter()
                     ]);
+                    const finalView = view;
+                    const tempView = finalView === VIEWS.OVERVIEW ? VIEWS.CALENDAR : VIEWS.OVERVIEW;
+                    view = tempView;
+                    await tick();
+                    view = finalView;
+                    await tick();
+                    goToToday();
                 }
             } else {
                 loginError = data.error || "Innlogging feilet.";
@@ -187,6 +194,10 @@
                     loadWorkoutPlan(data.sheetUrl), 
                     loadFellesOkter()
                 ]);
+                const finalView = view;
+                view = finalView === VIEWS.OVERVIEW ? VIEWS.CALENDAR : VIEWS.OVERVIEW;
+                await tick();
+                view = finalView;
                 selectedDate = null;
                 view = VIEWS.OVERVIEW;
             } else {
