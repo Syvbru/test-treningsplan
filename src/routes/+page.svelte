@@ -480,7 +480,7 @@
             lower.includes("sprintøkt") ||
             lower.includes("distanseøkt");
         const isRace = 
-            /(rennet|renn(?!forbered))/u.test(lower) ||
+            /(rennet|(?<!lang)renn(?!forbered))/u.test(lower) ||
             lower.includes("dsv-cup") ||
             lower.includes("km ") ||
             lower.includes(" km")||
