@@ -841,7 +841,7 @@
                     lower.includes("sprint") ||
                     lower.includes("sprintøkt") ||
                     lower.includes("distanseøkt") ||
-                    /(rennet|renn(?!forbered))/u.test(lower) ||
+                    /(rennet|(?<!lang)renn(?!forbered))/u.test(lower) ||
                     lower.includes("dsv-cup") ||
                     lower.includes("km ") ||
                     lower.includes(" km") ||
