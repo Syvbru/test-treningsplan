@@ -10,7 +10,7 @@
     import {
         Calendar, Clock, Zap, Dumbbell, BookOpen, Timer, Heart,
         BatteryCharging, User, Lock, ChevronDown, ChevronUp, Users,
-        ChevronLeft, ChevronRight, X, LogOut, ArrowLeft, ExternalLink,
+        ChevronLeft, ChevronRight, X, LogOut, ArrowLeft, SquarePen,
         FileText, Video, NotepadText, LineChart, MessageSquare
     } from "lucide-svelte";
 
@@ -1232,7 +1232,7 @@
                                 on:click={() => activeModal = null}
                                 class="flex items-center gap-3 w-full px-3 py-3 rounded-xl hover:bg-slate-50 transition-colors text-left mb-1">
                                 <span class="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center flex-shrink-0">
-                                    <ExternalLink class="h-6 w-6 text-green-700" />
+                                    <SquarePen class="h-6 w-6 text-green-700" />
                                 </span>
                                 <span class="text-sm font-medium text-slate-700 truncate">
                                     {isAdmin && currentUtoverNavn ? `${currentUtoverNavn} – Google Sheet` : "Min treningsplan (Rediger)"}
