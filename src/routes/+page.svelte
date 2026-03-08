@@ -223,7 +223,6 @@
                         }
                     });
                     fellesOkter = parsed;
-                    setTimeout(() => { fellesOkter = [...fellesOkter]; }, 2000);
                 }
             });
         } catch (e) { console.error("Felles økt feil:", e); }
@@ -341,6 +340,7 @@
     // Reaktivt kart over antall felles utøvere per dag — avhenger direkte av fellesOkter
     // slik at kortene oppdateres når fellesOkter lastes inn asynkront
     $: fellesCountByDay = (() => {
+        void fellesOkter; // tvinger Svelte til å tracke fellesOkter som avhengighet
         const result = new Map<string, number>();
         for (const day of cardDays) {
             const dayIso = format(day, "yyyy-MM-dd");
