@@ -2,53 +2,18 @@
     import { tick } from "svelte";
     import Papa from "papaparse";
     import {
-        parse,
-        format,
-        startOfDay,
-        addDays,
-        subDays,
-        addMonths,
-        subMonths,
-        startOfMonth,
-        endOfMonth,
-        getDay,
-        isSameDay,
-        parseISO,
-        isWithinInterval,
-        startOfWeek,
-        endOfWeek,
-        startOfYear,
-        endOfYear,
-        addWeeks,
-        subWeeks,
-        addYears,
-        subYears,
+        parse, format, startOfDay, addDays, subDays, addMonths, subMonths,
+        startOfMonth, endOfMonth, getDay, isSameDay, parseISO, isWithinInterval,
+        startOfWeek, endOfWeek, addWeeks, subWeeks, addYears, subYears, getISOWeek,
     } from "date-fns";
     import { nb } from "date-fns/locale";
     import {
-        Calendar,
-        LineChart,
-        NotepadText,
-        ChevronLeft,
-        ChevronRight,
-        Clock,
-        Zap,
-        Dumbbell,
-        BookOpen,
-        Timer,
-        Heart,
-        BatteryCharging,
-        User,
-        Lock,
-        ChevronDown,
-        ChevronUp,
-        Users,
-        Video,
-        ArrowLeft,
+        Calendar, Clock, Zap, Dumbbell, BookOpen, Timer, Heart,
+        BatteryCharging, User, Lock, ChevronDown, ChevronUp, Users,
+        ChevronLeft, ChevronRight, X, LogOut, ArrowLeft, ExternalLink,
+        FileText, Video, NotepadText, LineChart, MessageSquare
     } from "lucide-svelte";
 
-
-    // Login State
     let username = "";
     let password = "";
     let loggedIn = false;
@@ -58,13 +23,69 @@
     let currentUtoverNavn = "";
     let currentEditPlanSheet = "";
 
+    // ── START: POP UP ALERT – NY VERSJON AV TRENINGSPLAN ────────────────────────
+    let showVersionAlert = false;
 
-    // Felles økter data
-    let fellesOkter: Array<{ dato: string; okt: string; utovere: string[] }> =
-        [];
+    function startVersionAlertTimer() {
+        setTimeout(() => {
+            showVersionAlert = true;
+        }, 3500); // Vises 3,5 sekunder etter innlogging
+    }
+    // ── SLUTT: POP UP ALERT – NY VERSJON AV TRENINGSPLAN ────────────────────────
+
+    type ModalType = "session" | "calendar" | "profile" | null;
+    let activeModal: ModalType = null;
+    let selectedSessionGroup: { date: string; sessions: Workout[] } | null = null;
+    let showStyrkeSubmenu = false;
     let expandedDates = new Set<string>();
+    let statPeriod: "uke" | "maaned" | "sesong" = "uke";
+    let statAnchor: Date = startOfDay(new Date());
+    let showStatDropdown = false;
+    let showStatCalendar = false;
+    let statCalendarCursor: Date = startOfMonth(new Date());
+    let statCalendarDays: (Date | null)[] = [];
+    let lineTooltip: { x: number; y: number; label: string; hours: number } | null = null;
 
-    // Initial State Check og Auto-Login
+    // ── CARD SCROLL STATE ────────────────────────────────────────────────────────
+    let cardScrollEl: HTMLElement | null = null;
+    let cardAnchor: Date = startOfDay(new Date());
+    let cardBackDays = 7;
+    let cardForwardDays = 7;
+    const CARD_W = 156; // w-36 (144px) + gap-3 (12px)
+
+    function scrollToAnchor() {
+        if (!cardScrollEl) return;
+        cardScrollEl.scrollLeft = cardBackDays * CARD_W;
+    }
+
+    async function extendCardBack() {
+        cardBackDays += 7;
+        await tick();
+        if (cardScrollEl) cardScrollEl.scrollLeft += (7 - 1) * CARD_W;
+    }
+
+    async function extendCardForward() {
+        cardForwardDays += 7;
+        await tick();
+        if (cardScrollEl) cardScrollEl.scrollLeft += CARD_W;
+    }
+
+    let calendarModalCursor = startOfMonth(new Date());
+    let calendarModalDays: (Date | null)[] = [];
+
+    let fellesOkter: Array<{ dato: string; okt: string; utovere: string[] }> = [];
+
+    type Workout = {
+        date: string;
+        title: string;
+        durationMin?: number;
+        description?: string;
+    };
+
+    let workouts: Workout[] = [];
+    let today = startOfDay(new Date());
+    let selectedDate: Date | null = null;
+
     if (typeof window !== "undefined") {
         isLoading = true;
         fetch('/api/verify')
@@ -74,650 +95,467 @@
                     loggedIn = true;
                     isAdmin = data.isAdmin;
                     username = data.username || "";
-                    currentEditPlanSheet = data.editPlanSheet || "";  // LEGG TIL DENNE
-                    
+                    currentEditPlanSheet = data.editPlanSheet || "";
                     if (data.isAdmin) {
-                            if (data.lastSearchName) {
+                        if (data.lastSearchName) {
                             currentUtoverNavn = data.lastSearchName;
-                            // Automatisk søk på sist brukte navn
                             await searchUtoverByName();
                         }
-                        isLoading = false;
                     } else {
-                        // Vanlig bruker - last data
-                        await Promise.all([
-                            loadWorkoutPlan(data.sheetUrl), 
-                            loadFellesOkter()
-                        ]);
-                        isLoading = false;
-                        
-                        // Trigger view refresh
-                        const finalView = view;
-                        const tempView = finalView === VIEWS.OVERVIEW 
-                            ? VIEWS.CALENDAR 
-                            : VIEWS.OVERVIEW;
-                        view = tempView;
-                        await tick();
-                        view = finalView;
-                        await tick();
-                        goToToday();
+                        await Promise.all([loadWorkoutPlan(data.sheetUrl), loadFellesOkter()]);
+                        await tick(); scrollToAnchor();
                     }
-                } else {
-                    isLoading = false;
+                    // ── START: POP UP ALERT – start timer etter verifisert sesjon ─
+                    startVersionAlertTimer();
+                    // ── SLUTT: POP UP ALERT – start timer etter verifisert sesjon ─
                 }
-            })
-            .catch((error) => {
-                console.error('Verify error:', error);
                 isLoading = false;
-            });
+            })
+            .catch(() => { isLoading = false; });
     }
 
-    // Hovedfunksjon for innlogging
     async function handleLogin() {
-        loginError = "";
-        isLoading = true;
-
-        const plainUser = username.trim().toLowerCase();
-
+        loginError = ""; isLoading = true;
         try {
-            const response = await fetch('/api/login', {
+            const res = await fetch('/api/login', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    username: plainUser,
-                    password: password
-                })
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: username.trim().toLowerCase(), password })
             });
-
-            const data = await response.json();
-
-        if (data.success) {
-            loggedIn = true;
-            isAdmin = data.isAdmin;
-            username = data.username;
-            currentEditPlanSheet = data.editPlanSheet || "";  
-            
-            if (!data.isAdmin) {
-                    await Promise.all([
-                        loadWorkoutPlan(data.sheetUrl), 
-                        loadFellesOkter()
-                    ]);
-                    const finalView = view;
-                    const tempView = finalView === VIEWS.OVERVIEW ? VIEWS.CALENDAR : VIEWS.OVERVIEW;
-                    view = tempView;
-                    await tick();
-                    view = finalView;
-                    await tick();
-                    goToToday();
+            const data = await res.json();
+            if (data.success) {
+                loggedIn = true; isAdmin = data.isAdmin; username = data.username;
+                currentEditPlanSheet = data.editPlanSheet || "";
+                if (!data.isAdmin) {
+                    await Promise.all([loadWorkoutPlan(data.sheetUrl), loadFellesOkter()]);
+                    await tick(); scrollToAnchor();
                 }
-            } else {
-                loginError = data.error || "Innlogging feilet.";
-            }
-        } catch (error) {
-            console.error('Login error:', error);
-            loginError = "Kunne ikke koble til server.";
-        } finally {
-            isLoading = false;
-        }
+                // ── START: POP UP ALERT – start timer etter vellykket innlogging ─
+                startVersionAlertTimer();
+                // ── SLUTT: POP UP ALERT – start timer etter vellykket innlogging ─
+            } else { loginError = data.error || "Innlogging feilet."; }
+        } catch { loginError = "Kunne ikke koble til server."; }
+        finally { isLoading = false; }
     }
 
-    // Søk etter utøver basert på navn (admin)
     async function searchUtoverByName() {
         const searchName = currentUtoverNavn.trim();
-        if (!searchName) {
-            loginError = "Skriv inn et navn";
-            return;
-        }
-
-        loginError = "";
-        isLoading = true;
-
+        if (!searchName) { loginError = "Skriv inn et navn"; return; }
+        loginError = ""; isLoading = true;
         try {
-            const response = await fetch('/api/admin-search', {
+            const res = await fetch('/api/admin-search', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ 
-                    searchName: searchName
-                })
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ searchName })
             });
-
-            const data = await response.json();
-
+            const data = await res.json();
             if (data.success) {
                 currentUtoverNavn = data.searchName;
-                currentEditPlanSheet = data.editPlanSheet || "";  // LEGG TIL DENNE
-                await Promise.all([
-                    loadWorkoutPlan(data.sheetUrl), 
-                    loadFellesOkter()
-                ]);
-                const finalView = view;
-                view = finalView === VIEWS.OVERVIEW ? VIEWS.CALENDAR : VIEWS.OVERVIEW;
-                await tick();
-                view = finalView;
-                selectedDate = null;
-                view = VIEWS.OVERVIEW;
-            } else {
-                loginError = data.error || `Finner ingen utøver med navn: ${searchName}`;
-            }
-        } catch (error) {
-            console.error('Search error:', error);
-            loginError = "Kunne ikke koble til server.";
-        } finally {
-            isLoading = false;
-        }
+                currentEditPlanSheet = data.editPlanSheet || "";
+                await Promise.all([loadWorkoutPlan(data.sheetUrl), loadFellesOkter()]);
+                selectedDate = null; selectedSessionGroup = null;
+                cardAnchor = startOfDay(new Date()); cardBackDays = 7; cardForwardDays = 7;
+                await tick(); scrollToAnchor();
+            } else { loginError = data.error || `Finner ingen: ${searchName}`; }
+        } catch { loginError = "Kunne ikke koble til server."; }
+        finally { isLoading = false; }
     }
 
-    // Håndterer utlogging
     async function handleLogout() {
-        try {
-            await fetch('/api/logout', { method: 'POST' });
-        } catch (error) {
-            console.error('Logout error:', error);
-        }
-        
-        loggedIn = false;
-        username = "";
-        password = "";
-        loginError = "";
-        isLoading = false;
-        isAdmin = false;
-        currentUtoverNavn = "";
-        currentEditPlanSheet = "";
-        workouts = [];
-        fellesOkter = [];
-        expandedDates.clear();
-        selectedDate = null;
-        calendarCursor = startOfMonth(new Date());
-        view = VIEWS.OVERVIEW;
+        try { await fetch('/api/logout', { method: 'POST' }); } catch {}
+        loggedIn = false; username = ""; password = ""; loginError = "";
+        isLoading = false; isAdmin = false; currentUtoverNavn = ""; currentEditPlanSheet = "";
+        workouts = []; fellesOkter = []; expandedDates.clear();
+        selectedDate = null; selectedSessionGroup = null; activeModal = null;
     }
 
-    // CSV-lasting
     async function loadWorkoutPlan(sheetUrl: string) {
         try {
-            // Bruk sheetUrl direkte istedenfor lokal fil
-            const response = await fetch(sheetUrl);
-            
-            if (!response.ok) {
-                loginError = `Kunne ikke laste regneark. Sjekk at lenken er riktig og at regnearket er delt som "Alle med lenken kan se".`;
-                return;
-            }
-
-            const csvText = await response.text();
-
+            const res = await fetch(sheetUrl);
+            if (!res.ok) { loginError = "Kunne ikke laste regneark."; return; }
+            const csvText = await res.text();
             Papa.parse(csvText, {
-                header: false,
-                skipEmptyLines: true,
+                header: false, skipEmptyLines: true,
                 complete: (result) => {
                     const rows = result.data as string[][];
                     if (rows.length < 2) return;
-
-                    const header = rows[0].map((h) => h.trim().toLowerCase());
+                    const header = rows[0].map(h => h.trim().toLowerCase());
                     const parsed: Workout[] = [];
-
-                    const idxDato = header.findIndex((h) => h.includes("dato"));
-                    const idxHva1 = header.findIndex((h) =>
-                        h.includes("hva økt 1"),
-                    );
-                    const idxTid1 = header.findIndex((h) => h === "tid");
-                    const idxHva2 = header.findIndex((h) =>
-                        h.includes("hva økt 2"),
-                    );
-                    const idxTid2 = header.findIndex(
-                        (h, i) => h === "tid" && i > idxTid1,
-                    );
-                    const idxKommentar = header.findIndex((h) =>
-                        h.includes("kommentar"),
-                    );
-
+                    const iDato = header.findIndex(h => h.includes("dato"));
+                    const iHva1 = header.findIndex(h => h.includes("hva økt 1"));
+                    const iTid1 = header.findIndex(h => h === "tid");
+                    const iHva2 = header.findIndex(h => h.includes("hva økt 2"));
+                    const iTid2 = header.findIndex((h, i) => h === "tid" && i > iTid1);
+                    const iKom = header.findIndex(h => h.includes("kommentar"));
                     for (let i = 1; i < rows.length; i++) {
                         const row = rows[i];
-                        const dato = parseDate(row[idxDato]);
-                        const kommentar =
-                            idxKommentar >= 0
-                                ? (row[idxKommentar]?.trim() ?? "")
-                                : "";
-
-                        if (row[idxHva1]) {
-                            parsed.push({
-                                date: dato,
-                                title: row[idxHva1].trim(),
-                                durationMin: toMin(row[idxTid1]),
-                                description: kommentar,
-                            });
-                        }
-
-                        if (idxHva2 >= 0 && row[idxHva2]) {
-                            const tid2 = idxTid2 >= 0 ? row[idxTid2] : "";
-                            parsed.push({
-                                date: dato,
-                                title: row[idxHva2].trim(),
-                                durationMin: toMin(tid2),
-                                description: kommentar,
-                            });
-                        }
+                        const dato = parseDate(row[iDato]);
+                        const kom = iKom >= 0 ? (row[iKom]?.trim() ?? "") : "";
+                        if (row[iHva1]) parsed.push({ date: dato, title: row[iHva1].trim(), durationMin: toMin(row[iTid1]), description: kom });
+                        if (iHva2 >= 0 && row[iHva2]) parsed.push({ date: dato, title: row[iHva2].trim(), durationMin: toMin(iTid2 >= 0 ? row[iTid2] : ""), description: kom });
                     }
-
-                    workouts = parsed.filter((w) => w.date);
-                },
+                    workouts = parsed.filter(w => w.date);
+                }
             });
-        } catch (e) {
-            console.error("Feil ved lasting av plan:", e);
-            loginError =
-                "En uventet feil oppstod under lasting av treningsplanen. Sjekk at regnearket er delt offentlig.";
-        }
+        } catch (e) { console.error("Feil:", e); }
     }
 
-    // Last inn felles økter CSV
     async function loadFellesOkter() {
         try {
-            // Hent URL fra backend først
-            const urlResponse = await fetch('/api/felles-okter-url');
-            const urlData = await urlResponse.json();
-            
-            const response = await fetch(urlData.url);
-            
-            if (!response.ok) {
-                console.warn("Kunne ikke laste felles økter fra Google Sheets");
-                return;
-            }
-
-            const csvText = await response.text();
-
+            const urlRes = await fetch('/api/felles-okter-url');
+            const urlData = await urlRes.json();
+            const res = await fetch(urlData.url);
+            if (!res.ok) return;
+            const csvText = await res.text();
             Papa.parse(csvText, {
-                header: true,
-                skipEmptyLines: true,
+                header: true, skipEmptyLines: true,
                 complete: (result) => {
                     const rows = result.data as any[];
-                    const parsed: Array<{
-                        dato: string;
-                        okt: string;
-                        utovere: string[];
-                    }> = [];
-
-                    rows.forEach((row) => {
+                    const parsed: typeof fellesOkter = [];
+                    rows.forEach(row => {
                         const dato = row.Dato || row.dato || row.DATO;
                         const okt = row.Økt || row.økt || row.ØKT || row.Okt;
-                        const utovere =
-                            row.Utøvere ||
-                            row.utøvere ||
-                            row.UTØVERE ||
-                            row.Utovere;
-
+                        const utovere = row.Utøvere || row.utøvere || row.UTØVERE || row.Utovere;
                         if (dato && okt && utovere) {
                             const parsedDato = parseDate(dato);
-                            const utovereList = utovere
-                                .split(",")
-                                .map((n: string) => n.trim())
-                                .filter((n: string) => n.length > 0);
-
-                            if (parsedDato && utovereList.length > 0) {
-                                parsed.push({
-                                    dato: parsedDato,
-                                    okt: okt.trim(),
-                                    utovere: utovereList,
-                                });
-                            }
+                            const list = utovere.split(",").map((n: string) => n.trim()).filter((n: string) => n.length > 0);
+                            if (parsedDato && list.length > 0) parsed.push({ dato: parsedDato, okt: okt.trim(), utovere: list });
                         }
                     });
-
                     fellesOkter = parsed;
-                },
+                }
             });
-        } catch (e) {
-            console.error("Feil ved lasting av felles økter:", e);
-        }
+        } catch (e) { console.error("Felles økt feil:", e); }
     }
 
-    // Hjelpefunksjon for å finne felles utøvere for en spesifikk økt
-    function getFellesUtovere(date: string, sessionTitle: string): string[] {
-        const currentUser = isAdmin
-            ? currentUtoverNavn.trim()
-            : username.trim();
-
-        if (!currentUser || !sessionTitle) {
-            return [];
-        }
-
-        const matching = fellesOkter.filter(
-            (fo) =>
-                fo.dato === date &&
-                fo.okt.toLowerCase() === sessionTitle.toLowerCase(),
-        );
-
-        const allUtovere = new Set<string>();
-        matching.forEach((fo) => {
-            const hasUser = fo.utovere.some(
-                (u) => u.toLowerCase() === currentUser.toLowerCase(),
-            );
-
-            if (hasUser) {
-                fo.utovere.forEach((u) => {
-                    if (u.toLowerCase() !== currentUser.toLowerCase()) {
-                        allUtovere.add(u);
-                    }
-                });
-            }
-        });
-
-        return Array.from(allUtovere).sort();
-    }
-
-    // Toggle funksjon for dropdown
-    function toggleExpanded(date: string) {
-        if (expandedDates.has(date)) {
-            expandedDates.delete(date);
-        } else {
-            expandedDates.add(date);
-        }
-        expandedDates = expandedDates;
-    }
-
-    // Typer og visninger
-    type Workout = {
-        date: string;
-        title: string;
-        durationMin?: number;
-        description?: string;
-    };
-
-    const VIEWS = {
-        OVERVIEW: "overview",
-        CALENDAR: "calendar",
-        TECHNIQUE: "technique",
-        STATISTICS: "statistics",
-    } as const;
-
-    type View = (typeof VIEWS)[keyof typeof VIEWS];
-    let view: View = VIEWS.OVERVIEW;
-    // Statistikk state
-    let statsPeriod: "week" | "month" | "year" = "month";
-    let statsStartDate = startOfMonth(new Date());
-    let showStatsCalendar = false;
-    let statsCalendarCursor = new Date();
-    let statsCalendarDays: (Date | null)[] = [];
-
-    let workouts: Workout[] = [];
-    let today = startOfDay(new Date());
-    let selectedDate: Date | null = null;
-    let calendarCursor = startOfMonth(new Date());
-    let windowMode: "next" | "prev" = "next";
-
-    // Hjelpefunksjoner
     function toMin(t: string): number {
         if (!t) return 0;
-        const [h, m] = t.split(":").map((x) => parseInt(x) || 0);
+        const [h, m] = t.split(":").map(x => parseInt(x) || 0);
         return h * 60 + m;
     }
 
     function formatTime(mins: number): string {
         if (!mins) return "";
-        const h = Math.floor(mins / 60);
-        const m = mins % 60;
+        const h = Math.floor(mins / 60), m = mins % 60;
         if (h > 0 && m > 0) return `${h}t ${m}min`;
         if (h > 0) return `${h}t`;
-        if (m > 0) return `${m}min`;
-        return "";
+        return `${m}min`;
     }
-
-    function getWorkoutInfo(title: string) {
-        const lower = title.toLowerCase();
-        if (lower.includes("intervall"))
-            return {
-                icon: Timer,
-                color: "bg-red-100 text-red-700",
-                iconBg: "bg-red-100",
-                iconColor: "text-red-700",
-                label: "Intervall",
-                italic: false,
-            };
-        const isHardKeyword =
-            lower.includes("motbakkeløp") ||
-            lower.includes("sprint") || 
-            lower.includes("sprintøkt") ||
-            lower.includes("distanseøkt");
-        const isRace = 
-            /(rennet|(?<!lang)renn(?!forbered))/u.test(lower) ||
-            lower.includes("dsv-cup") ||
-            lower.includes("km ") ||
-            lower.includes(" km")||
-            lower.includes("birken")||
-            lower.includes("klubbmesterskap") ||
-            lower.includes("skifestival");
-
-        if (isHardKeyword || isRace) {
-            return {
-                icon: Timer,
-                color: "bg-red-100 text-red-700",
-                iconBg: "bg-red-100",
-                iconColor: "text-red-700",
-                label: "Hardt",
-                italic: false,
-            };
-        }
-
-        if (lower.includes("hvile"))
-            return {
-                icon: BatteryCharging,
-                color: "bg-green-100 text-green-800",
-                iconBg: "bg-green-100",
-                iconColor: "text-green-800",
-                label: "Hvile",
-                italic: false,
-            };
-        if (lower.includes("langtur"))
-            return {
-                icon: Heart,
-                color: "bg-cyan-100 text-cyan-800",
-                iconBg: "bg-cyan-100",
-                iconColor: "text-cyan-800",
-                label: "Langtur i1",
-                italic: false,
-            };
-        if (lower.includes("hurtighet"))
-            return {
-                icon: Zap,
-                color: "bg-slate-100 text-violet-600 border border-slate-200",
-                label: "Hurtighet",
-                italic: false,
-            };
-        if (lower.includes("teknikk"))
-            return {
-                icon: BookOpen,
-                color: "bg-slate-100 text-violet-600 border border-slate-200",
-                label: "Teknikk",
-                italic: false,
-            };
-        if (lower.includes("styrke"))
-            return {
-                icon: Dumbbell,
-                color: "bg-yellow-100 text-yellow-800",
-                iconBg: "bg-yellow-100",
-                iconColor: "text-yellow-800",
-                label: "Styrke",
-                italic: false,
-            };
-        if (lower.includes("rennforberedende"))
-            return {
-                icon: Heart,
-                color: "bg-slate-100 text-violet-600 border border-slate-200",
-                label: "Forberedelser",
-                italic: false,
-            };
-        return {
-            icon: Heart,
-            color: "bg-slate-100 text-violet-600 border border-slate-200",
-            label: "Rolig i1",
-            italic: false,
-        };
-    }
-
 
     function parseDate(str: string) {
         if (!str) return "";
         const clean = str.trim().toLowerCase();
-        
-        // Prøv først å parse med fullt år (dd.MM.yyyy format)
         const parts = clean.split(".");
         if (parts.length >= 3) {
-            const day = parts[0].padStart(2, "0");
-            const month = parts[1].padStart(2, "0");
-            const year = parts[2].trim();
-            
-            const parsed = parse(
-                `${day}.${month}.${year}`,
-                "dd.MM.yyyy",
-                new Date(),
-                { locale: nb },
-            );
-            
-            if (!isNaN(parsed.getTime())) {
-                return format(startOfDay(parsed), "yyyy-MM-dd");
-            }
+            const p = parse(`${parts[0].padStart(2,"0")}.${parts[1].padStart(2,"0")}.${parts[2].trim()}`, "dd.MM.yyyy", new Date(), { locale: nb });
+            if (!isNaN(p.getTime())) return format(startOfDay(p), "yyyy-MM-dd");
         }
-        
-        // Fallback: Prøv å parse med månedsnavn (d. MMMM format)
-        const cleanWithSpace = clean.replace(/(\d+)\.(\p{L}+)/u, "$1. $2");
-        const today = new Date();
-        const currentYear = today.getFullYear();
-        const currentMonth = today.getMonth();
-        
-        let parsed = parse(
-            `${cleanWithSpace} ${currentYear}`,
-            "d. MMMM yyyy",
-            new Date(),
-            { locale: nb },
-        );
-        
-        if (isNaN(parsed.getTime())) {
-            // Prøv dd.MM format uten år
-            if (parts.length >= 2) {
-                const day = parts[0].padStart(2, "0");
-                const month = parts[1].padStart(2, "0");
-                parsed = parse(
-                    `${day}.${month}.${currentYear}`,
-                    "dd.MM.yyyy",
-                    new Date(),
-                    { locale: nb },
-                );
-            }
-        }
-        
-        if (isNaN(parsed.getTime())) return "";
-        
-        const parsedMonth = parsed.getMonth();
-        
-        // Sesonglogikk: Mai (4) til April (3) neste år
-        if (currentMonth >= 4) {
-            if (parsedMonth <= 3) {
-                parsed = new Date(currentYear + 1, parsedMonth, parsed.getDate());
-            }
-        } else {
-            if (parsedMonth >= 4) {
-                parsed = new Date(currentYear - 1, parsedMonth, parsed.getDate());
-            }
-        }
-        
-        return format(startOfDay(parsed), "yyyy-MM-dd");
+        const cY = new Date().getFullYear(), cM = new Date().getMonth();
+        const cws = clean.replace(/(\d+)\.(\p{L}+)/u, "$1. $2");
+        let p = parse(`${cws} ${cY}`, "d. MMMM yyyy", new Date(), { locale: nb });
+        if (isNaN(p.getTime()) && parts.length >= 2)
+            p = parse(`${parts[0].padStart(2,"0")}.${parts[1].padStart(2,"0")}.${cY}`, "dd.MM.yyyy", new Date(), { locale: nb });
+        if (isNaN(p.getTime())) return "";
+        const pm = p.getMonth();
+        if (cM >= 4) { if (pm <= 3) p = new Date(cY + 1, pm, p.getDate()); }
+        else { if (pm >= 4) p = new Date(cY - 1, pm, p.getDate()); }
+        return format(startOfDay(p), "yyyy-MM-dd");
     }
 
-    function endOfDayIncl(d: Date) {
-        const endOfDay = new Date(d);
-        endOfDay.setHours(23, 59, 59, 999);
-        return endOfDay;
+    function endOfDayIncl(d: Date) { const e = new Date(d); e.setHours(23,59,59,999); return e; }
+
+    function getWorkoutInfo(title: string) {
+        const lower = title.toLowerCase();
+        if (lower.includes("intervall"))
+            return { icon: Timer, color: "text-red-700", bg: "bg-red-50", hex: "#B91C1C", hexBg: "#FEF2F2" };
+        const isHard = lower.includes("motbakkeløp") || lower.includes("sprint") || lower.includes("sprintøkt") || lower.includes("distanseøkt") || /(rennet|(?<!lang)renn(?!forbered))/u.test(lower) || lower.includes("dsv-cup") || lower.includes("km ") || lower.includes(" km") || lower.includes("birken") || lower.includes("klubbmesterskap") || lower.includes("skifestival");
+        if (isHard)
+            return { icon: Timer, color: "text-red-700", bg: "bg-red-50", hex: "#B91C1C", hexBg: "#FEF2F2" };
+        if (lower.includes("hvile"))
+            return { icon: BatteryCharging, color: "text-green-700", bg: "bg-green-50", hex: "#15803D", hexBg: "#F0FDF4" };
+        if (lower.includes("langtur"))
+            return { icon: Heart, color: "text-[#19747E]", bg: "bg-[#A9D6E5]/50", hex: "#0F766E", hexBg: "#F0FDFA" };
+        if (lower.includes("hurtighet"))
+            return { icon: Zap, color: "text-[#A9D6E5]", bg: "bg-[#A9D6E5]/20", hex: "#0369A1", hexBg: "#F0F9FF" };
+        if (lower.includes("teknikk"))
+            return { icon: BookOpen, color: "text-[#A9D6E5]", bg: "bg-[#A9D6E5]/20", hex: "#0369A1", hexBg: "#F0F9FF" };
+        if (lower.includes("styrke"))
+            return { icon: Dumbbell, color: "text-yellow-700", bg: "bg-yellow-50", hex: "#A16207", hexBg: "#FEFCE8" };
+        if (lower.includes("rennforberedende"))
+            return { icon: Heart, color: "text-[#A9D6E5]", bg: "bg-[#A9D6E5]/20", hex: "#0369A1", hexBg: "#F0F9FF" };
+        return { icon: Heart, color: "text-[#A9D6E5]", bg: "bg-[#A9D6E5]/20", hex: "#0369A1", hexBg: "#F0F9FF" };
     }
 
-    // Dato-logikk
-    $: activeDate = selectedDate ? selectedDate : today;
-    $: activeIso = format(activeDate, "yyyy-MM-dd");
-    $: activeWorkouts = workouts.filter((w) => w.date === activeIso);
-    $: windowDates =
-        windowMode === "next"
-            ? { start: addDays(activeDate, 1), end: addDays(activeDate, 6) }
-            : { start: subDays(activeDate, 7), end: subDays(activeDate, 1) };
+    // Extract movement-form title from a workout name for the card heading
+    const MOVEMENT_FORMS = ["klassisk", "skate", "skøyting", "staking", "styrke", "løp", "løping", "jogg", "hvile", "sykkel", "skierg", "spinning", "mølle", "roing"];
+    function getCardTitle(title: string): string {
+        const lower = title.toLowerCase();
+        // Intervall overrides everything
+        if (lower.includes("intervall")) return "Intervall";
+        // Hurtighet and Styrke override movement form
+        if (lower.includes("hurtighet")) return "Hurtighet";
+        if (lower.includes("styrke")) return "Styrke";
+        // Renn-logic
+        const isRenn = lower.includes("motbakkeløp") || lower.includes("sprint") || lower.includes("sprintøkt") || lower.includes("distanseøkt") || /(rennet|(?<!lang)renn(?!forbered))/u.test(lower) || lower.includes("dsv-cup") || lower.includes("km ") || lower.includes(" km") || lower.includes("birken") || lower.includes("klubbmesterskap") || lower.includes("skifestival");
+        if (isRenn) return "Renn";
+        for (const form of MOVEMENT_FORMS) {
+            if (lower.includes(form)) {
+                return form.charAt(0).toUpperCase() + form.slice(1);
+            }
+        }
+        // Fallback: first word
+        return title.split(" ")[0];
+    }
 
-    $: windowWorkouts = workouts
-        .filter((w) => {
-            const d = parseISO(w.date);
-            return (
-                !isSameDay(d, activeDate) &&
-                isWithinInterval(d, {
-                    start: startOfDay(windowDates.start),
-                    end: endOfDayIncl(windowDates.end),
-                })
-            );
-        })
-        .sort((a, b) => {
-            return windowMode === ("prev" as typeof windowMode)
-                ? b.date.localeCompare(a.date)
-                : a.date.localeCompare(b.date);
+    function getFellesUtovere(date: string, sessionTitle: string): string[] {
+        const cur = isAdmin ? currentUtoverNavn.trim() : username.trim();
+        if (!cur || !sessionTitle) return [];
+        const matching = fellesOkter.filter(fo => fo.dato === date && fo.okt.toLowerCase() === sessionTitle.toLowerCase());
+        const all = new Set<string>();
+        matching.forEach(fo => {
+            if (fo.utovere.some(u => u.toLowerCase() === cur.toLowerCase()))
+                fo.utovere.forEach(u => { if (u.toLowerCase() !== cur.toLowerCase()) all.add(u); });
         });
+        return Array.from(all).sort();
+    }
 
-    // Reaktiv blokk for å sikre at felles utøvere oppdateres
+    function groupByDate(list: Workout[]) {
+        const map = new Map<string, Workout[]>();
+        list.forEach(w => { if (!map.has(w.date)) map.set(w.date, []); map.get(w.date)!.push(w); });
+        return Array.from(map.entries()).map(([date, sessions]) => ({ date, sessions }));
+    }
+
+    $: activeDate = selectedDate ?? today;
+    $: activeIso = format(activeDate, "yyyy-MM-dd");
+    $: currentWeekNum = getISOWeek(activeDate);
     $: {
         if (username.trim() && fellesOkter.length > 0 && loggedIn) {
             expandedDates = expandedDates;
         }
     }
+    $: cardDays = Array.from(
+        { length: cardBackDays + 1 + cardForwardDays },
+        (_, i) => addDays(cardAnchor, i - cardBackDays)
+    );
+    // Reaktivt kart over antall felles utøvere per dag — avhenger direkte av fellesOkter
+    // slik at kortene oppdateres når fellesOkter lastes inn asynkront
+    $: fellesCountByDay = (() => {
+        const result = new Map<string, number>();
+        for (const day of cardDays) {
+            const dayIso = format(day, "yyyy-MM-dd");
+            const dw = workouts.filter(w => w.date === dayIso);
+            if (dw.length > 0) {
+                const f1 = getFellesUtovere(dayIso, dw[0]?.title ?? "");
+                const f2 = dw.length >= 2 ? getFellesUtovere(dayIso, dw[1]?.title ?? "") : [];
+                result.set(dayIso, new Set([...f1, ...f2]).size);
+            }
+        }
+        return result;
+    })();
 
-    // Kalender
-    function changeMonth(dir: "next" | "prev") {
-        calendarCursor =
-            dir === "next"
-                ? addMonths(calendarCursor, 1)
-                : subMonths(calendarCursor, 1);
-    }
-
-    $: {
-        const monthStart = startOfMonth(calendarCursor);
-        const monthEnd = endOfMonth(calendarCursor);
-        const startWeekday = (getDay(monthStart) + 6) % 7;
-        const totalDays = monthEnd.getDate();
-
-        days = [];
-        for (let i = 0; i < startWeekday; i++) days.push(null);
-        for (let d = 0; d < totalDays; d++) days.push(addDays(monthStart, d));
-    }
-
-    let days: (Date | null)[] = [];
-
-    function selectDay(d: Date) {
-        selectedDate = startOfDay(d);
-        view = VIEWS.OVERVIEW;
-    }
-
-    function goToToday() {
-        selectedDate = null;
-        calendarCursor = startOfMonth(new Date());
-        view = VIEWS.OVERVIEW;
-    }
-
-    function groupByDate(list: Workout[]) {
-        const map = new Map<string, Workout[]>();
-        list.forEach((w) => {
-            if (!map.has(w.date)) map.set(w.date, []);
-            map.get(w.date)!.push(w);
+    $: barStats = (() => {
+        const t = statAnchor;
+        const now = new Date();
+        let pStart: Date, pEnd: Date;
+        if (statPeriod === "uke") {
+            pStart = startOfWeek(t, { weekStartsOn: 1 });
+            pEnd = endOfWeek(t, { weekStartsOn: 1 });
+        } else if (statPeriod === "maaned") {
+            pStart = startOfMonth(t);
+            pEnd = endOfMonth(t);
+        } else {
+            const isAfterMay = t.getMonth() >= 4;
+            pStart = isAfterMay ? new Date(t.getFullYear(), 4, 1) : new Date(t.getFullYear() - 1, 4, 1);
+            pEnd = isAfterMay ? new Date(t.getFullYear() + 1, 3, 30, 23,59,59) : new Date(t.getFullYear(), 3, 30, 23,59,59);
+        }
+        const sw = workouts.filter(w => { const d = parseISO(w.date); return d >= pStart && d <= pEnd; });
+        let hard = 0, langtur = 0, styrke = 0, hvile = 0;
+        sw.forEach(w => {
+            const lower = w.title.toLowerCase();
+            if (lower.includes("hvile")) hvile++;
+            else if (lower.includes("styrke")) styrke++;
+            else if (lower.includes("langtur")) langtur++;
+            else {
+                const isH = lower.includes("intervall") || lower.includes("motbakkeløp") || lower.includes("sprint") || lower.includes("distanseøkt") || /(rennet|(?<!lang)renn(?!forbered))/u.test(lower) || lower.includes("dsv-cup") || lower.includes("km ") || lower.includes(" km") || lower.includes("birken") || lower.includes("klubbmesterskap") || lower.includes("skifestival");
+                if (isH) hard++;
+            }
         });
-        return Array.from(map.entries()).map(([date, sessions]) => ({
-            date,
-            sessions,
-        }));
+        const totalMins = sw.reduce((s, w) => s + (w.durationMin || 0), 0);
+        const totalSessions = sw.length - hvile;
+        return {
+            items: [
+                { label: "Hardøkter", value: hard, barColor: "#B91C1C" },
+                { label: "Styrke", value: styrke, barColor: "#A16207" },
+                { label: "Langturer", value: langtur, barColor: "#0F766E" },
+                { label: "Hvile", value: hvile, barColor: "#15803D" },
+            ],
+            total: totalSessions,
+            totalHours: Math.floor(totalMins / 60),
+            totalMins: totalMins % 60,
+        };
+    })();
+
+    $: lineChartData = (() => {
+        if (workouts.length === 0) return [];
+        const t = statAnchor;
+        const result: { label: string; hours: number }[] = [];
+
+        if (statPeriod === "uke") {
+            const weekStart = startOfWeek(t, { weekStartsOn: 1 });
+            for (let i = 0; i < 7; i++) {
+                const day = addDays(weekStart, i);
+                const key = format(day, "yyyy-MM-dd");
+                const mins = workouts.filter(w => w.date === key && w.durationMin).reduce((s, w) => s + (w.durationMin || 0), 0);
+                result.push({ label: format(day, "EEE", { locale: nb }), hours: mins / 60 });
+            }
+        } else if (statPeriod === "maaned") {
+            const mStart = startOfMonth(t);
+            const mEnd = endOfMonth(t);
+            let weekStart = startOfWeek(mStart, { weekStartsOn: 1 });
+            while (weekStart <= mEnd) {
+                const wEnd = endOfWeek(weekStart, { weekStartsOn: 1 });
+                // Use full week range for the chart — days outside the month are included
+                const mins = workouts.filter(w => {
+                    const d = parseISO(w.date);
+                    return d >= weekStart && d <= wEnd && w.durationMin;
+                }).reduce((s, w) => s + (w.durationMin || 0), 0);
+                result.push({ label: `U${getISOWeek(weekStart)}`, hours: mins / 60 });
+                weekStart = addWeeks(weekStart, 1);
+            }
+        } else {
+            const isAfterMay = t.getMonth() >= 4;
+            const sYear = isAfterMay ? t.getFullYear() : t.getFullYear() - 1;
+            const addM = (year: number, month: number) => {
+                const key = format(new Date(year, month, 1), 'yyyy-MM');
+                const mins = workouts.filter(w => w.date.startsWith(key) && w.durationMin).reduce((s, w) => s + (w.durationMin || 0), 0);
+                result.push({ label: format(new Date(year, month, 1), 'MMM', { locale: nb }), hours: mins / 60 });
+            };
+            for (let m = 4; m <= 11; m++) addM(sYear, m);
+            for (let m = 0; m <= 3; m++) addM(sYear + 1, m);
+        }
+        return result;
+    })();
+
+    // Pre-computed chart values (avoids {@const} outside block elements)
+    $: barMaxV = Math.max(...barStats.items.map(i => i.value), 1);
+    $: barChartItems = barStats.items.map((item, idx) => {
+        const bw = 36, gap = 20;
+        const x = idx * (bw + gap) + 24;
+        const bh = Math.max((item.value / barMaxV) * 70, 2);
+        const y = 90 - bh;
+        return { ...item, bw, x, bh, y };
+    });
+
+    $: lineMaxH = Math.max(...lineChartData.map(d => d.hours), 0.1);
+    $: lineYTicks = (() => {
+        const maxVal = Math.max(Math.ceil(lineMaxH), 1);
+        const maxTicks = statPeriod === "uke" ? 6 : 4;
+        // Find a "nice" step: smallest of [1,2,3,4,5,6,8,10,12,15,20,25,30] giving ≤ maxTicks ticks
+        const candidates = [1,2,3,4,5,6,8,10,12,15,20,25,30,40,50];
+        const step = candidates.find(s => Math.ceil(maxVal / s) <= maxTicks) ?? Math.ceil(maxVal / maxTicks);
+        const top = Math.ceil(maxVal / step) * step;
+        const ticks: number[] = [];
+        for (let v = step; v <= top; v += step) ticks.push(v);
+        return ticks;
+    })();
+    $: lineMaxCeil = lineYTicks[lineYTicks.length - 1] ?? 1;
+    $: linePts = lineChartData.length > 1
+        ? lineChartData.map((d, i) => ({
+            x: (i / (lineChartData.length - 1)) * 224 + 30,
+            y: 82 - (d.hours / lineMaxCeil) * 62,
+            label: d.label,
+            hours: d.hours
+          }))
+        : [];
+
+    function fmtHours(h: number): string {
+        const totalMin = Math.round(h * 60);
+        const hh = Math.floor(totalMin / 60), mm = totalMin % 60;
+        if (hh > 0 && mm > 0) return `${hh}.${String(mm).padStart(2,"0")}`;
+        if (hh > 0) return `${hh}`;
+        return `${mm}m`;
+    }
+    $: linePoly = linePts.map(p => `${p.x},${p.y}`).join(" ");
+    $: lineArea = linePts.length > 0
+        ? `M ${linePts[0].x},88 ` + linePts.map(p => `L ${p.x},${p.y}`).join(" ") + ` L ${linePts[linePts.length-1].x},88 Z`
+        : "";
+
+    function openCalendarModal() {
+        calendarModalCursor = startOfMonth(activeDate);
+        updateCalendarModalDays();
+        activeModal = "calendar";
+    }
+    function updateCalendarModalDays() {
+        const ms = startOfMonth(calendarModalCursor), me = endOfMonth(calendarModalCursor);
+        const sw = (getDay(ms) + 6) % 7;
+        calendarModalDays = [];
+        for (let i = 0; i < sw; i++) calendarModalDays.push(null);
+        for (let d = 0; d < me.getDate(); d++) calendarModalDays.push(addDays(ms, d));
+    }
+    $: if (activeModal === "calendar") updateCalendarModalDays();
+
+    async function selectCalendarDate(d: Date) {
+        selectedDate = startOfDay(d);
+        selectedSessionGroup = null;
+        activeModal = null;
+        cardAnchor = startOfDay(d);
+        cardBackDays = 7;
+        cardForwardDays = 7;
+        await tick();
+        if (cardScrollEl) cardScrollEl.scrollLeft = cardBackDays * CARD_W;
     }
 
-    $: viewTransform =
-        view === VIEWS.CALENDAR ? "translateX(100%)" : "translateX(0)";
-    $: isCalendarView = view === VIEWS.CALENDAR;
+    function setPeriod(val: string) {
+        statPeriod = val as "uke" | "maaned" | "sesong";
+        statAnchor = startOfDay(new Date());
+        showStatDropdown = false;
+    }
 
-    // Hamburgermeny state
-    let menuOpen = false;
-    let showStyrkeSubmenu = false;
+    function prevStatPeriod() {
+        if (statPeriod === "uke") statAnchor = subWeeks(statAnchor, 1);
+        else if (statPeriod === "maaned") statAnchor = subMonths(statAnchor, 1);
+        else statAnchor = subYears(statAnchor, 1);
+    }
 
-    // PDF-lenker
-    const intensitetssoner = { title: "Intensitetssoner", url: "/pdf/Intensitessoner.pdf" };
-    
+    function nextStatPeriod() {
+        if (statPeriod === "uke") statAnchor = addWeeks(statAnchor, 1);
+        else if (statPeriod === "maaned") statAnchor = addMonths(statAnchor, 1);
+        else statAnchor = addYears(statAnchor, 1);
+    }
+
+    $: statPeriodLabel = (() => {
+        const t = statAnchor;
+        if (statPeriod === "uke") return `Uke ${getISOWeek(t)}`;
+        if (statPeriod === "maaned") return format(t, "MMMM yyyy", { locale: nb });
+        const isAfterMay = t.getMonth() >= 4;
+        const sYear = isAfterMay ? t.getFullYear() : t.getFullYear() - 1;
+        return `Sesong ${sYear}/${sYear + 1}`;
+    })();
+
+    function openStatCalendar() {
+        statCalendarCursor = startOfMonth(statAnchor);
+        updateStatCalendarDays();
+        showStatCalendar = true;
+        showStatDropdown = false;
+    }
+    function updateStatCalendarDays() {
+        const ms = startOfMonth(statCalendarCursor), me = endOfMonth(statCalendarCursor);
+        const sw = (getDay(ms) + 6) % 7;
+        statCalendarDays = [];
+        for (let i = 0; i < sw; i++) statCalendarDays.push(null);
+        for (let d = 0; d < me.getDate(); d++) statCalendarDays.push(addDays(ms, d));
+    }
+    function selectStatCalendarDate(d: Date) {
+        statAnchor = startOfDay(d);
+        showStatCalendar = false;
+    }
+
+    function openSessionDetail(date: string, sessions: Workout[]) {
+        selectedDate = parseISO(date);
+        selectedSessionGroup = { date, sessions };
+        activeModal = "session";
+    }
+
     const styrkeProgrammer = [
         { title: "Styrke med vekter", url: "/pdf/StyrkeMedVekter.pdf" },
         { title: "Styrke uten vekter", url: "/pdf/StyrkeUtenVekter.pdf" },
@@ -725,1749 +563,735 @@
         { title: "Kort styrkeøkt overkropp", url: "/pdf/KortStyrkeøktOverkropp.pdf" },
         { title: "Kort styrkeøkt ben", url: "/pdf/KortStyrkeøktBen.pdf" },
     ];
-
-    function toggleMenu() {
-        menuOpen = !menuOpen;
-        if (!menuOpen) {
-            showStyrkeSubmenu = false;
-        }
-    }
-
-    function openPdf(url: string) {
-        window.open(url, '_blank');
-        menuOpen = false;
-        showStyrkeSubmenu = false;
-    }
-
-    function showStyrkeMenu() {
-        showStyrkeSubmenu = true;
-    }
-
-    function backToMainMenu() {
-        showStyrkeSubmenu = false;
-    }
-
-    // Statistikkfunksjoner
-    function getPeriodDates(period: typeof statsPeriod, startDate: Date) {
-        switch (period) {
-            case "week":
-                return {
-                    start: startOfWeek(startDate, { weekStartsOn: 1 }),
-                    end: endOfWeek(startDate, { weekStartsOn: 1 })
-                };
-            case "month":
-                return {
-                    start: startOfMonth(startDate),
-                    end: endOfMonth(startDate)
-                };
-            case "year":
-                const currentYear = startDate.getFullYear();
-                const isAfterMay = startDate.getMonth() >= 4; // Mai er index 4
-                const seasonStartYear = isAfterMay ? currentYear : currentYear - 1;
-                
-                return {
-                    start: new Date(seasonStartYear, 4, 1), // 1. mai
-                    end: new Date(seasonStartYear + 1, 3, 30, 23, 59, 59) // 30. april neste år
-                };
-        }
-    }
-
-    function changePeriod(direction: "next" | "prev") {
-        switch (statsPeriod) {
-            case "week":
-                statsStartDate = direction === "next" 
-                    ? addWeeks(statsStartDate, 1) 
-                    : subWeeks(statsStartDate, 1);
-                break;
-            case "month":
-                statsStartDate = direction === "next" 
-                    ? addMonths(statsStartDate, 1) 
-                    : subMonths(statsStartDate, 1);
-                break;
-            case "year":
-                statsStartDate = direction === "next" 
-                    ? addYears(statsStartDate, 1) 
-                    : subYears(statsStartDate, 1);
-                break;
-        }
-    }
-
-    function getPeriodLabel(period: typeof statsPeriod, startDate: Date): string {
-        switch (period) {
-            case "week":
-                const weekStart = startOfWeek(startDate, { weekStartsOn: 1 });
-                const weekEnd = endOfWeek(startDate, { weekStartsOn: 1 });
-                return `Uke ${format(weekStart, "w, yyyy", { locale: nb })}`;
-            case "month":
-                return format(startDate, "MMMM yyyy", { locale: nb });
-            case "year":
-                const currentYear = startDate.getFullYear();
-                const isAfterMay = startDate.getMonth() >= 4;
-                const startYear = isAfterMay ? currentYear : currentYear - 1;
-                return `${startYear}/${startYear + 1}`;
-        }
-    }
-
-    $: periodDates = getPeriodDates(statsPeriod, statsStartDate);
-    $: periodWorkouts = workouts.filter((w) => {
-        const d = parseISO(w.date);
-        return isWithinInterval(d, {
-            start: startOfDay(periodDates.start),
-            end: endOfDayIncl(periodDates.end),
-        });
-    });
-
-    $: stats = (() => {
-        let hardOkter = 0;
-        let langtur = 0;
-        let styrke = 0;
-        let hvile = 0;
-        let totalMinutes = 0;
-
-        periodWorkouts.forEach((w) => {
-            const lower = w.title.toLowerCase();
-            
-            // Kategorisering
-            if (lower.includes("hvile")) {
-                hvile++;
-            } else if (lower.includes("styrke")) {
-                styrke++;
-            } else if (lower.includes("langtur")) {
-                langtur++;
-            } else {
-                // Sjekk om det er hardøkt
-                const isHard = lower.includes("intervall") ||
-                    lower.includes("motbakkeløp") ||
-                    lower.includes("sprint") ||
-                    lower.includes("sprintøkt") ||
-                    lower.includes("distanseøkt") ||
-                    /(rennet|(?<!lang)renn(?!forbered))/u.test(lower) ||
-                    lower.includes("dsv-cup") ||
-                    lower.includes("km ") ||
-                    lower.includes(" km") ||
-                    lower.includes("birken") ||
-                    lower.includes("klubbmesterskap") ||
-                    lower.includes("skifestival");
-                
-                if (isHard) {
-                    hardOkter++;
-                }
-            }
-            
-            if (w.durationMin) {
-                totalMinutes += w.durationMin;
-            }
-        });
-
-        const totalHours = Math.floor(totalMinutes / 60);
-        const totalMins = totalMinutes % 60;
-
-        return {
-            hardOkter,
-            langtur,
-            styrke,
-            hvile,
-            totalEconomic: periodWorkouts.length - hvile, // Alle økter unntatt hvile
-            totalHours,
-            totalMins,
-            totalMinutes
-        };
-    })();    
-
-    // Kalenderdialog-funksjoner
-    function openStatsCalendar() {
-        showStatsCalendar = true;
-        statsCalendarCursor = statsStartDate;
-        updateStatsCalendarDays();
-    }
-
-    function closeStatsCalendar() {
-        showStatsCalendar = false;
-    }
-
-    function updateStatsCalendarDays() {
-        const monthStart = startOfMonth(statsCalendarCursor);
-        const monthEnd = endOfMonth(statsCalendarCursor);
-        const startWeekday = (getDay(monthStart) + 6) % 7;
-        const totalDays = monthEnd.getDate();
-
-        statsCalendarDays = [];
-        for (let i = 0; i < startWeekday; i++) statsCalendarDays.push(null);
-        for (let d = 0; d < totalDays; d++) statsCalendarDays.push(addDays(monthStart, d));
-    }
-
-    function changeStatsCalendarMonth(dir: "next" | "prev") {
-        statsCalendarCursor = dir === "next" 
-            ? addMonths(statsCalendarCursor, 1) 
-            : subMonths(statsCalendarCursor, 1);
-        updateStatsCalendarDays();
-    }
-
-    function selectStatsDate(date: Date) {
-        if (statsPeriod === "week") {
-            statsStartDate = startOfWeek(date, { weekStartsOn: 1 });
-        } else if (statsPeriod === "month") {
-            statsStartDate = startOfMonth(date);
-        } else {
-            const isAfterMay = date.getMonth() >= 4;
-            const seasonStartYear = isAfterMay ? date.getFullYear() : date.getFullYear() - 1;
-            statsStartDate = new Date(seasonStartYear, 4, 1);
-        }
-        closeStatsCalendar();
-    }
-
-    // Oppdater kalenderdager når cursor endres
-    $: if (showStatsCalendar) {
-        updateStatsCalendarDays();
-    }
 </script>
 
 {#if !loggedIn}
-    <div
-        class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-95 p-4"
-    >
-        <div
-            class="w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl transition-all duration-500 ease-in-out transform scale-100"
-        >
-            <h2 class="mb-6 text-center text-3xl font-bold text-violet-700">
-                Treningsplan
-            </h2>
+<div class="fixed inset-0 flex items-center justify-center bg-gradient-to-br from-[#19747E] via-[#19747E]/80 to-[#19747E]/60 p-4">
+    <div class="w-full max-w-sm bg-white rounded-3xl p-8 shadow-2xl">
+        <h2 class="text-center font-bold text-3xl mb-1">
+            <span class="text-[#A9D6E5] italic">TRENINGS</span><span class="text-[#19747E] italic">PLAN</span>
+        </h2>
+        <p class="text-center text-slate-400 text-sm mb-8">Logg inn for å se din treningsplan</p>
 
-            <div class="mb-4">
-                <label
-                    for="username"
-                    class="mb-2 flex items-center text-sm font-medium text-gray-700"
-                >
-                    <User class="mr-2 h-4 w-4" /> Brukernavn
-                </label>
-                <input
-                    id="username"
-                    type="text"
-                    bind:value={username}
-                    disabled={isLoading}
-                    class="w-full rounded-xl border border-gray-300 px-4 py-3 text-lg focus:border-violet-500 focus:ring-violet-500 disabled:bg-gray-100"
-                />
-            </div>
-
-            <div class="mb-6">
-                <label
-                    for="password"
-                    class="mb-2 flex items-center text-sm font-medium text-gray-700"
-                >
-                    <Lock class="mr-2 h-4 w-4" /> Passord
-                </label>
-                <input
-                    id="password"
-                    type="password"
-                    bind:value={password}
-                    disabled={isLoading}
-                    on:keydown={(e) => {
-                        if (e.key === "Enter") handleLogin();
-                    }}
-                    class="w-full rounded-xl border border-gray-300 px-4 py-3 text-lg focus:border-violet-500 focus:ring-violet-500 disabled:bg-gray-100"
-                />
-            </div>
-
-            {#if loginError}
-                <div
-                    class="mb-4 rounded-lg bg-red-100 p-3 text-sm font-medium text-red-700"
-                >
-                    {loginError}
-                </div>
-            {/if}
-
-            <button
-                on:click={handleLogin}
-                disabled={isLoading || !username || !password}
-                class="flex w-full items-center justify-center rounded-xl bg-violet-600 px-4 py-3 text-lg font-semibold text-white shadow-md transition-colors hover:bg-violet-700 disabled:bg-violet-300"
-            >
-                {#if isLoading}
-                    <svg
-                        class="mr-3 h-5 w-5 animate-spin"
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                    >
-                        <circle
-                            class="opacity-25"
-                            cx="12"
-                            cy="12"
-                            r="10"
-                            stroke="currentColor"
-                            stroke-width="4"
-                        ></circle>
-                        <path
-                            class="opacity-75"
-                            fill="currentColor"
-                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                        ></path>
-                    </svg>
-                    Logger inn...
-                {:else}
-                    Logg inn
-                {/if}
-            </button>
+        <div class="mb-4">
+            <label for="username" class="block text-xs font-semibold text-slate-500 uppercase tracking-widest mb-1.5">Brukernavn</label>
+            <input id="username" type="text" bind:value={username} disabled={isLoading}
+                class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-base focus:border-[#19747E]/60 focus:ring-2 focus:ring-[#19747E] outline-none transition disabled:opacity-60"
+                placeholder="Ditt brukernavn" autocomplete="username" />
         </div>
+        <div class="mb-6">
+            <label for="password" class="block text-xs font-semibold text-slate-500 uppercase tracking-widest mb-1.5">Passord</label>
+            <input id="password" type="password" bind:value={password} disabled={isLoading}
+                on:keydown={(e) => { if (e.key === "Enter") handleLogin(); }}
+                class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-base focus:border-[#19747E]/60 focus:ring-2 focus:ring-[#19747E] outline-none transition disabled:opacity-60"
+                placeholder="••••••••" autocomplete="current-password" />
+        </div>
+
+        {#if loginError}
+            <div class="mb-4 rounded-xl bg-red-50 border border-red-200 p-3 text-sm text-red-700">{loginError}</div>
+        {/if}
+
+        <button on:click={handleLogin} disabled={isLoading || !username || !password}
+            class="w-full flex items-center justify-center gap-2 rounded-xl bg-[#19747E] text-white py-3 text-base font-bold tracking-wide transition disabled:opacity-40 disabled:cursor-not-allowed">
+            {#if isLoading}
+                <svg class="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Logger inn…
+            {:else}
+                Logg inn
+            {/if}
+        </button>
     </div>
+</div>
 {/if}
 
 {#if loggedIn}
-    <div class="min-h-screen bg-slate-50">
-        <div class="bg-gradient-to-r from-violet-600 to-fuchsia-500 text-white">
-            <div class="mx-auto max-w-5xl px-4 py-8">
-                <!-- Øverste rad: H1 og Hamburgermeny (PC) / H1 og Hamburgermeny (Mobil) -->
-                <div class="flex justify-between items-center mb-4 sm:mb-6 relative">
-                    <h1 class="text-3xl sm:text-5xl font-bold">TRENINGSPLAN</h1>
+<div class="min-h-screen bg-slate-100">
 
-                    <!-- Hamburgermeny knapp -->
-                    <button
-                        on:click={toggleMenu}
-                        class="bg-white/20 hover:bg-white/30 p-2 rounded-xl transition-colors relative"
-                        aria-label="Meny"
-                    >
-                        <div class="w-6 h-6 flex flex-col justify-center items-center relative">
-                            <span
-                                class="absolute w-6 h-0.5 bg-white rounded-full transition-all duration-600 ease-out"
-                                class:rotate-45={menuOpen}
-                                class:-translate-y-2={!menuOpen}
-                            ></span>
-                            <span
-                                class="absolute w-6 h-0.5 bg-white rounded-full transition-all duration-600 ease-out"
-                                class:opacity-0={menuOpen}
-                                class:scale-0={menuOpen}
-                            ></span>
-                            <span
-                                class="absolute w-6 h-0.5 bg-white rounded-full transition-all duration-600 ease-out"
-                                class:-rotate-45={menuOpen}
-                                class:translate-y-2={!menuOpen}
-                            ></span>
-                        </div>
-                    </button>
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- START: POP UP ALERT – NY VERSJON AV TRENINGSPLAN                      -->
+    <!-- Vises 5 sekunder etter innlogging. Lukkes med X-knappen.               -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    {#if showVersionAlert}
+        <div class="fixed inset-x-0 top-20 z-[200] flex justify-center px-4 pointer-events-none">
+            <div class="pointer-events-auto w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-[#A9D6E5] overflow-hidden"
+                role="alertdialog" aria-live="polite" aria-label="Ny versjon tilgjengelig">
 
-                    <!-- Dropdown meny -->
-                    {#if menuOpen}
-                        <div class="absolute top-full right-0 mt-2 bg-white rounded-xl shadow-2xl border border-violet-200 min-w-[250px] z-50 overflow-hidden">
-                            {#if !showStyrkeSubmenu}
-                                <!-- Hovedmeny -->
-                                <div class="py-2">
-                                    <div class="px-4 py-2 text-sm font-semibold text-violet-700 border-b border-violet-100">
-                                        Meny
-                                    </div>
-                                    
-                                    {#if currentEditPlanSheet}
-                                        <button
-                                            on:click={() => {
-                                                window.open(currentEditPlanSheet, '_blank');
-                                                menuOpen = false;
-                                            }}
-                                            class="w-full text-left px-4 py-3 hover:bg-violet-50 transition-colors text-slate-700 font-medium flex items-center gap-2 border-b border-violet-100"
-                                        >
-                                            <svg class="h-5 w-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-                                            </svg>
-                                            {isAdmin && currentUtoverNavn ? `${currentUtoverNavn} treningsplan (Rediger)` : 'Min treningsplan (Rediger)'}
-                                        </button>
-                                    {/if}
-                                    
-                                    <button
-                                        on:click={() => {
-                                            view = VIEWS.TECHNIQUE;
-                                            menuOpen = false;
-                                        }}
-                                        class="w-full text-left px-4 py-3 hover:bg-violet-50 transition-colors text-slate-700 font-medium flex items-center gap-2 border-b border-violet-100"
-                                    >
-                                        <Video class="h-5 w-5 text-violet-600" />
-                                        Teknikkvideoer
-                                    </button>
+                <!-- Fargestripe øverst -->
+                <div class="h-2 w-full bg-gradient-to-r from-[#19747E] to-[#A9D6E5]"></div>
 
-                                    <button
-                                        on:click={showStyrkeMenu}
-                                        class="w-full text-left px-4 py-3 hover:bg-violet-50 transition-colors text-slate-700 font-medium flex items-center gap-2 border-b border-violet-100"
-                                    >
-                                        <Dumbbell class="h-5 w-5 text-violet-600" />
-                                        Styrkeøkter
-                                        <ChevronRight class="h-4 w-4 ml-auto text-slate-400" />
-                                    </button>
+                <div class="p-6">
+                    <!-- Tittel og lukk-knapp -->
+                    <div class="flex items-start justify-between gap-4 mb-3">
+                        <p class="sm: text-lg md:text-xl font-bold text-slate-800 leading-snug">Ny versjon av Treningsplan 🎉</p>
 
-                                    <button
-                                        on:click={() => openPdf(intensitetssoner.url)}
-                                        class="w-full text-left px-4 py-3 hover:bg-violet-50 transition-colors text-slate-700 font-medium flex items-center gap-2"
-                                    >
-                                        <svg class="h-5 w-5 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
-                                        </svg>
-                                        Intensitetssoner
-                                    </button>
-                                </div>
-                            {:else}
-                                <!-- Styrkeøkter undermeny -->
-                                <div class="py-2">
-                                    <div class="flex items-center px-4 py-2 border-b border-violet-100">
-                                        <button
-                                            on:click={backToMainMenu}
-                                            class="flex items-center gap-2 text-violet-700 hover:text-violet-800 transition-colors"
-                                        >
-                                            <ArrowLeft class="h-4 w-4" />
-                                            <span class="text-sm font-semibold">Tilbake</span>
-                                        </button>
-                                    </div>
-
-                                    <div class="px-4 py-2 text-sm font-semibold text-violet-700 border-b border-violet-100">
-                                        Styrkeøkter
-                                    </div>
-
-                                    {#each styrkeProgrammer as program}
-                                        <button
-                                            on:click={() => openPdf(program.url)}
-                                            class="w-full text-left px-4 py-3 hover:bg-violet-50 transition-colors text-slate-700 font-medium flex items-center gap-2"
-                                        >
-                                            <svg class="h-5 w-5 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
-                                            </svg>
-                                            {program.title}
-                                        </button>
-                                    {/each}
-                                </div>
-                            {/if}
-                        </div>
-                    {/if}
-                </div>
-
-                <!-- Admin søkefelt (hvis admin) -->
-                {#if isAdmin}
-                    <div class="mb-4 flex flex-col sm:flex-row gap-3 items-start sm:items-center w-full">
-                        <div class="flex-1 flex gap-2 w-full">
-                            <input
-                                type="text"
-                                bind:value={currentUtoverNavn}
-                                on:keydown={(e) => {
-                                    if (e.key === "Enter") searchUtoverByName();
-                                }}
-                                placeholder="Søk etter utøvernavn..."
-                                class="flex-1 rounded-full border-0 bg-white/20 px-4 py-2 text-white placeholder-white/60 font-medium focus:bg-white/30 focus:ring-2 focus:ring-white/50"
-                            />
-                            <button
-                                on:click={searchUtoverByName}
-                                disabled={isLoading || !currentUtoverNavn.trim()}
-                                class="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-full font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                            >
-                                {#if isLoading}
-                                    <svg
-                                        class="h-4 w-4 animate-spin"
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        fill="none"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <circle
-                                            class="opacity-25"
-                                            cx="12"
-                                            cy="12"
-                                            r="10"
-                                            stroke="currentColor"
-                                            stroke-width="4"
-                                        ></circle>
-                                        <path
-                                            class="opacity-75"
-                                            fill="currentColor"
-                                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                                        ></path>
-                                    </svg>
-                                {:else}
-                                    <User class="h-4 w-4" />
-                                {/if}
-                                Søk
-                            </button>
-                        </div>
+                        <!-- Lukk-knapp -->
+                        <button
+                            on:click={() => showVersionAlert = false}
+                            class="flex-shrink-0 bg-slate-100 hover:bg-slate-200 rounded-lg p-2 text-slate-400 transition-colors"
+                            aria-label="Lukk varsling">
+                            <X class="h-5 w-5" />
+                        </button>
                     </div>
 
-                    {#if loginError}
-                        <div class="mb-3 rounded-lg bg-red-500/90 p-3 text-sm font-medium text-white">
-                            {loginError}
-                        </div>
-                    {/if}
-                {/if}
-
-                <!-- Logg ut (mobil - over slider) -->
-                <div class="sm:hidden mb-4 flex justify-start">
-                    <button
-                        on:click={handleLogout}
-                        class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-xl text-sm font-medium transition-colors flex items-center gap-1"
-                    >
-                        <Lock class="h-4 w-4" /> Logg ut
-                    </button>
-                </div>
-
-                <!-- Nederste rad: Logg ut (PC) og Slider -->
-                <div class="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 sm:gap-4">
-                    <!-- Logg ut (desktop - venstre side) -->
-                    <button
-                        on:click={handleLogout}
-                        class="hidden sm:flex bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-xl text-sm font-medium transition-colors items-center gap-1"
-                    >
-                        <Lock class="h-4 w-4" /> Logg ut
-                    </button>
-
-                    <!-- Slider (høyre side på PC, full bredde på mobil) -->
-                    <div class="flex justify-end w-full sm:w-auto">
-                        <div
-                            class="relative flex bg-white/15 rounded-full w-full sm:w-[345px]"
-                            style="padding: 0.175rem;">
-                            <div
-                                class="absolute rounded-full transition-all {view === VIEWS.TECHNIQUE ? 'bg-transparent' : 'duration-[700ms] bg-white shadow-md'}"
-                                style={`top: 0.175rem; left: 0.175rem; height: calc(100% - 0.35rem); width: calc(33.333% - 0.38rem); transform: translateX(${
-                                    view === VIEWS.OVERVIEW
-                                        ? "0"
-                                        : view === VIEWS.CALENDAR
-                                        ? "calc(100% + 0.35rem)"
-                                        : "calc(200% + 0.7rem)"
-                                });`}
-                            ></div>
-
-                            <button
-                                on:click={() => (view = VIEWS.OVERVIEW)}
-                                class={`relative z-10 w-1/3 py-2 text-sm font-medium flex items-center justify-center transition-colors ${
-                                    view === VIEWS.OVERVIEW
-                                        ? "text-violet-600"
-                                        : "text-white/80 hover:text-white"
-                                }`}
-                            >
-                                <NotepadText class="h-4 w-4 mr-1" /> Plan
-                            </button>
-                            <button
-                                on:click={() => (view = VIEWS.CALENDAR)}
-                                class={`relative z-10 w-1/3 py-2 text-sm font-medium flex items-center justify-center transition-colors ${
-                                    view === VIEWS.CALENDAR
-                                        ? "text-violet-600"
-                                        : "text-white/80 hover:text-white"
-                                }`}
-                            >
-                                <Calendar class="h-4 w-4 mr-1" /> Kalender
-                            </button>
-                            <button
-                                on:click={() => (view = VIEWS.STATISTICS)}
-                                class={`relative z-10 w-1/3 py-2 text-sm font-medium flex items-center justify-center transition-colors ${
-                                    view === VIEWS.STATISTICS
-                                        ? "text-violet-600"
-                                        : "text-white/80 hover:text-white"
-                                }`}
-                                >
-                                    <LineChart class="h-4 w-4 mr-1" /> Statistikk
-                            </button>
-                        </div>
-                    </div>
+                    <!-- Tekstinnhold -->
+                    <p class="text-base text-slate-600 leading-relaxed">
+                        For å se utfyllende informasjon om økten, som kommentarer og hvem som har like økter må du
+                        trykke på en dag.
+                    </p>
+                    <p class="text-base text-slate-600 mt-4 leading-relaxed">
+                        Du kan skrolle frem og tilbake mellom dager sideveis.
+                    </p>
                 </div>
             </div>
         </div>
+    {/if}
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- SLUTT: POP UP ALERT – NY VERSJON AV TRENINGSPLAN                      -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
 
-        <div class="mx-auto max-w-5xl px-4 py-6 sm:py-8">
-            {#if view === VIEWS.OVERVIEW}
-                <h2 class="mb-3 text-2xl font-semibold">
-                    {#if selectedDate}
-                        {format(selectedDate, "EEEE d. MMMM", { locale: nb })}
-                    {:else}
-                        I dag
-                    {/if}
-                </h2>
-            {/if}
-
-            {#if view === VIEWS.OVERVIEW && activeWorkouts.length > 0}
-                {#each groupByDate(activeWorkouts) as g}
-                    {@const isDoubleSession = g.sessions.length >= 2}
-                    {@const s1Title = g.sessions[0]?.title || "Økt 1"}
-                    {@const s2Title = g.sessions[1]?.title || "Økt 2"}
-                    {@const fellesUtovere1 = getFellesUtovere(g.date, s1Title)}
-                    {@const fellesUtovere2 = isDoubleSession
-                        ? getFellesUtovere(g.date, s2Title)
-                        : []}
-                    {@const uniqueFellesUtovere = Array.from(
-                        new Set([...fellesUtovere1, ...fellesUtovere2]),
-                    )}
-                    {@const totalCount = uniqueFellesUtovere.length}
-                    {@const isRestDay = g.sessions.some((s) =>
-                        s.title.toLowerCase().includes("hvile"),
-                    )}
-
-                    <div class="rounded-2xl border border-violet-500 bg-white shadow-sm mb-3 overflow-hidden">
-                        <div class="bg-violet-50 py-3 border-b border-violet-500">
-                            <p class="text-slate-900 font-semibold text-base sm:text-lg px-4">
-                            <span class="capitalize"> {format(parseISO(g.date), "EEEE", { locale: nb })} </span> {" "} {format(parseISO(g.date), "d.MMMM", { locale: nb })}
-                            </p>
-                        </div>
-                        <div class="p-4">
-                            <div class="mb-1 grid gap-y-5">
-                                {#each g.sessions as s}
-                                    {#key s}
-                                        {#await Promise.resolve(getWorkoutInfo(s.title)) then info}
-                                            <div
-                                                class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 sm:gap-0 w-full"
-                                            >
-                                                <div
-                                                    class="flex items-stretch gap-3 w-full"
-                                                >
-                                                    <div
-                                                        class={`flex items-center justify-center w-12 h-12 sm:w-13 sm:h-13 rounded-xl shrink-0 ${info.iconBg ?? "bg-slate-100"}`}
-                                                    >
-                                                        <svelte:component
-                                                            this={info.icon}
-                                                            class={`h-8 w-8 sm:h-6 sm:w-6 ${info.iconColor ?? "text-violet-600"}`}
-                                                        />
-                                                    </div>
-
-                                                    <div
-                                                        class="flex flex-col justify-between w-full min-w-0 h-12 sm:h-13"
-                                                    >
-                                                        <div
-                                                            class="text-slate-800 text-[15px] sm:text-lg font-semibold leading-tight"
-                                                        >
-                                                            {s.title}
-                                                        </div>
-
-                                                        <div
-                                                            class="flex items-center flex-wrap gap-x-1 leading-none mt-[1px]"
-                                                        >
-                                                            <div
-                                                                class={`flex items-center px-2 py-[2px] rounded-full text-[13px] sm:text-[14px] font-medium gap-1 ${info.color} ${info.italic ? "italic" : ""}`}
-                                                            >
-                                                                <svelte:component
-                                                                    this={info.icon}
-                                                                    class="h-[15px] w-[15px]"
-                                                                />
-                                                                {info.label}
-                                                            </div>
-
-                                                            {#if s.durationMin}
-                                                                <div
-                                                                    class="flex items-center text-[13px] sm:text-[14px] text-slate-600 mt-[1px]"
-                                                                >
-                                                                    <Clock
-                                                                        class="inline h-[15px] w-[15px] mr-0.5 text-slate-500"
-                                                                    />
-                                                                    {formatTime(
-                                                                        s.durationMin,
-                                                                    )}
-                                                                </div>
-                                                            {/if}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        {/await}
-                                    {/key}
-                                {/each}
-                            </div>
-
-                            {#if g.sessions[0].description}
-                                <p class="mt-3 text-slate-700">
-                                    {g.sessions[0].description}
-                                </p>
-                            {/if}
-
-                            {#if !isRestDay}
-                                <button
-                                    on:click={() => toggleExpanded(g.date)}
-                                    class="mt-3 flex items-center gap-2 text-violet-600 hover:text-violet-700 font-medium text-sm transition-colors w-full"
-                                >
-                                    <Users class="h-4 w-4" />
-                                    {#if totalCount > 0}
-                                        {totalCount}
-                                        {totalCount === 1
-                                            ? "person har"
-                                            : "personer har"} samme økt{isDoubleSession
-                                            ? "er"
-                                            : ""}
-                                    {:else}
-                                        Finner ingen med lik økt
-                                    {/if}
-                                    {#if expandedDates.has(g.date)}
-                                        <ChevronUp class="h-4 w-4 ml-auto" />
-                                    {:else}
-                                        <ChevronDown class="h-4 w-4 ml-auto" />
-                                    {/if}
-                                </button>
-
-                                {#if expandedDates.has(g.date)}
-                                    <div class="mt-2 bg-violet-50 rounded-lg p-3">
-                                        {#if isDoubleSession}
-                                            {#if fellesUtovere1.length > 0}
-                                                <p
-                                                    class="text-sm font-semibold mb-2 text-slate-700"
-                                                >
-                                                    Økt 1:
-                                                </p>
-                                                <div
-                                                    class="flex flex-wrap gap-2 mb-3 pb-3 border-b border-violet-200"
-                                                >
-                                                    {#each fellesUtovere1 as utover}
-                                                        <div
-                                                            class="bg-white px-3 py-1 rounded-full text-sm font-medium text-violet-700 border border-violet-200"
-                                                        >
-                                                            {utover}
-                                                        </div>
-                                                    {/each}
-                                                </div>
-                                            {:else}
-                                                <p
-                                                    class="text-sm font-semibold mb-2 text-slate-700"
-                                                >
-                                                    Økt 1:
-                                                </p>
-                                                <p
-                                                    class="text-sm text-slate-600 italic mb-3 pb-3 border-b border-violet-200"
-                                                >
-                                                    Ingen andre har denne økten.
-                                                </p>
-                                            {/if}
-
-                                            {#if fellesUtovere2.length > 0}
-                                                <p
-                                                    class="text-sm font-semibold mb-2 text-slate-700"
-                                                >
-                                                    Økt 2:
-                                                </p>
-                                                <div class="flex flex-wrap gap-2">
-                                                    {#each fellesUtovere2 as utover}
-                                                        <div
-                                                            class="bg-white px-3 py-1 rounded-full text-sm font-medium text-violet-700 border border-violet-200"
-                                                        >
-                                                            {utover}
-                                                        </div>
-                                                    {/each}
-                                                </div>
-                                            {:else}
-                                                <p
-                                                    class="text-sm font-semibold mb-2 text-slate-700"
-                                                >
-                                                    Økt 2:
-                                                </p>
-                                                <p
-                                                    class="text-sm text-slate-600 italic"
-                                                >
-                                                    Ingen andre har denne økten.
-                                                </p>
-                                            {/if}
-                                        {:else if fellesUtovere1.length > 0}
-                                            <div class="flex flex-wrap gap-2">
-                                                {#each fellesUtovere1 as utover}
-                                                    <div
-                                                        class="bg-white px-3 py-1 rounded-full text-sm font-medium text-violet-700 border border-violet-200"
-                                                    >
-                                                        {utover}
-                                                    </div>
-                                                {/each}
-                                            </div>
-                                        {:else}
-                                            <p
-                                                class="text-sm text-slate-600 italic"
-                                            >
-                                                Ingen andre er satt opp med denne økten.
-                                            </p>
-                                        {/if}
-                                    </div>
-                                {/if}
-                            {/if}
-                        </div>
-                    </div>
-                {/each}
-            {:else if view === VIEWS.OVERVIEW}
-                <div
-                    class="rounded-2xl border border-dashed border-slate-300 bg-white p-4 text-slate-600"
-                >
-                    Ingen planlagt økt for denne dagen.
+    <!-- HEADER -->
+    <header class="bg-slate-100 sticky top-0 z-50">
+        <div class="mx-auto max-w-5xl px-4 pt-5 pb-2">
+            <div class="flex justify-between items-end">
+                <div>
+                    <p class="text-xs font-semibold tracking-widest text-[#19747E] uppercase mb-0.5">
+                        {format(activeDate, "EEEE d. MMMM", { locale: nb })}
+                    </p>
+                    <h1 class="text-3xl md:text-4xl font-bold italic leading-none tracking-tight">
+                        <span class="text-[#A9D6E5]">TRENINGS</span><span class="text-[#19747E]">PLAN</span>
+                    </h1>
                 </div>
-            {/if}
-
-            {#if view === VIEWS.OVERVIEW}
-                <div
-                    class="relative mt-6 flex bg-slate-200 rounded-full w-[270px]"
-                    style="padding: 0.175rem;"
-                >
-                    <div
-                        class="absolute bg-violet-600 rounded-full shadow-sm transition-all duration-[700ms] ease-in-out"
-                        style={`top: 0.175rem; left: 0.175rem; height: calc(100% - 0.35rem); width: calc(50% - 0.38rem); transform: translateX(${windowMode === "next" ? "calc(100% + 0.35rem)" : "0"});`}
-                    ></div>
-
-                    <button
-                        on:click={() => (windowMode = "prev")}
-                        class={`relative z-10 w-1/2 text-sm font-medium py-2 transition-all duration-500 ${
-                            windowMode === "prev"
-                                ? "text-white"
-                                : "text-slate-700 hover:text-violet-700"
-                        }`}
-                    >
-                        7 forrige dager
+                <div class="flex gap-2 self-end">
+                    <button on:click={openCalendarModal}
+                        class="bg-white text-[#19747E] rounded-full p-2 md:p-2.5 transition-colors border border-transparent hover:border-[#19747E]"
+                        aria-label="Kalender">
+                        <Calendar class="h-4 w-4 md:h-5 md:w-5" />
                     </button>
 
-                    <button
-                        on:click={() => (windowMode = "next")}
-                        class={`relative z-10 w-1/2 text-sm font-medium py-2 transition-all duration-500 ${
-                            windowMode === "next"
-                                ? "text-white"
-                                : "text-slate-700 hover:text-violet-700"
-                        }`}
-                    >
-                        7 neste dager
+                    <button on:click={() => { activeModal = "profile"; showStyrkeSubmenu = false; }}
+                        class="bg-white text-[#19747E] rounded-full p-2 md:p-2.5 transition-colors border border-transparent hover:border-[#19747E]"
+                        aria-label="Profil">
+                        <User class="h-4 w-4 md:h-5 md:w-5" />
                     </button>
                 </div>
-            {/if}
+            </div>
 
-            {#if view === VIEWS.OVERVIEW}
-                <h3 class="mt-4 mb-6 text-xl font-semibold">
-                    {windowMode === "next"
-                        ? "Kommende økter"
-                        : "Tidligere økter"}
-                </h3>
-
-                {#if windowWorkouts.length === 0}
-                    <div
-                        class="border border-dashed border-slate-300 rounded-xl p-6 text-slate-600"
-                    >
-                        Ingen økter i valgt periode.
-                    </div>
-                {:else}
-                    {#each groupByDate(windowWorkouts) as g}
-                        {@const isDoubleSession = g.sessions.length >= 2}
-                        {@const s1Title = g.sessions[0]?.title || "Økt 1"}
-                        {@const s2Title = g.sessions[1]?.title || "Økt 2"}
-                        {@const fellesUtovere1 = getFellesUtovere(
-                            g.date,
-                            s1Title,
-                        )}
-                        {@const fellesUtovere2 = isDoubleSession
-                            ? getFellesUtovere(g.date, s2Title)
-                            : []}
-                        {@const uniqueFellesUtovere = Array.from(
-                            new Set([...fellesUtovere1, ...fellesUtovere2]),
-                        )}
-                        {@const totalCount = uniqueFellesUtovere.length}
-                        {@const isRestDay = g.sessions.some((s) =>
-                            s.title.toLowerCase().includes("hvile"),
-                        )}
-
-                        <div class="rounded-2xl border border-slate-200 bg-white shadow-sm mb-6 overflow-hidden">
-                            <div class="bg-violet-50 py-3">
-                                <p class="text-slate-900 font-semibold text-base sm:text-lg px-4">
-                                    <span class="capitalize"> {format(parseISO(g.date), "EEEE", { locale: nb })} </span> {" "} {format(parseISO(g.date), "d.MMMM", { locale: nb })}
-                                </p>
-                            </div>
-
-                            <div class="p-4">
-                                <div class="mb-1 grid gap-y-5">
-                                    {#each g.sessions as s}
-                                        {#key s}
-                                            {#await Promise.resolve(getWorkoutInfo(s.title)) then info}
-                                                <div
-                                                    class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 sm:gap-0 w-full"
-                                                >
-                                                    <div
-                                                        class="flex items-stretch gap-3 w-full"
-                                                    >
-                                                        <div
-                                                            class={`flex items-center justify-center w-13 h-13 sm:w-12 sm:h-12 rounded-xl shrink-0 ${info.iconBg ?? "bg-slate-100"}`}
-                                                        >
-                                                            <svelte:component
-                                                                this={info.icon}
-                                                                class={`h-8 w-8 sm:h-6 sm:w-6 ${info.iconColor ?? "text-violet-600"}`}
-                                                            />
-                                                        </div>
-
-                                                        <div
-                                                            class="flex flex-col justify-between w-full min-w-0 h-13 sm:h-12"
-                                                        >
-                                                            <div
-                                                                class="text-slate-800 text-[15px] sm:text-lg font-semibold leading-tight"
-                                                            >
-                                                                {s.title}
-                                                            </div>
-
-                                                            <div
-                                                                class="flex items-center flex-wrap gap-x-1 leading-none mt-[1px]"
-                                                            >
-                                                                <div
-                                                                    class={`flex items-center px-2 py-[2px] rounded-full text-[13px] sm:text-[14px] font-medium gap-1 ${info.color} ${info.italic ? "italic" : ""}`}
-                                                                >
-                                                                    <svelte:component
-                                                                        this={info.icon}
-                                                                        class="h-[15px] w-[15px]"
-                                                                    />
-                                                                    {info.label}
-                                                                </div>
-
-                                                                {#if s.durationMin}
-                                                                    <div
-                                                                        class="flex items-center text-[13px] sm:text-[14px] text-slate-600 mt-[1px]"
-                                                                    >
-                                                                        <Clock
-                                                                            class="inline h-[15px] w-[15px] mr-0.5 text-slate-500"
-                                                                        />
-                                                                        {formatTime(
-                                                                            s.durationMin,
-                                                                        )}
-                                                                    </div>
-                                                                {/if}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            {/await}
-                                        {/key}
-                                    {/each}
-                                </div>
-                            
-
-                                {#if g.sessions[0].description}
-                                    <p class="mt-3 text-slate-700">
-                                        {g.sessions[0].description}
-                                    </p>
-                                {/if}
-
-                                {#if !isRestDay}
-                                    <button
-                                        on:click={() => toggleExpanded(g.date)}
-                                        class="mt-3 flex items-center gap-2 text-violet-600 hover:text-violet-700 font-medium text-sm transition-colors w-full"
-                                    >
-                                        <Users class="h-4 w-4" />
-                                        {#if totalCount > 0}
-                                            {totalCount}
-                                            {totalCount === 1
-                                                ? "person har"
-                                                : "personer har"} samme økt{isDoubleSession
-                                                ? "er"
-                                                : ""}
-                                        {:else}
-                                            Finner ingen med lik økt
-                                        {/if}
-                                        {#if expandedDates.has(g.date)}
-                                            <ChevronUp class="h-4 w-4 ml-auto" />
-                                        {:else}
-                                            <ChevronDown class="h-4 w-4 ml-auto" />
-                                        {/if}
-                                    </button>
-
-                                    {#if expandedDates.has(g.date)}
-                                        <div
-                                            class="mt-2 bg-violet-50 rounded-lg p-3"
-                                        >
-                                            {#if isDoubleSession}
-                                                {#if fellesUtovere1.length > 0}
-                                                    <p
-                                                        class="text-sm font-semibold mb-2 text-slate-700"
-                                                    >
-                                                        Økt 1:
-                                                    </p>
-                                                    <div
-                                                        class="flex flex-wrap gap-2 mb-3 pb-3 border-b border-violet-200"
-                                                    >
-                                                        {#each fellesUtovere1 as utover}
-                                                            <div
-                                                                class="bg-white px-3 py-1 rounded-full text-sm font-medium text-violet-700 border border-violet-200"
-                                                            >
-                                                                {utover}
-                                                            </div>
-                                                        {/each}
-                                                    </div>
-                                                {:else}
-                                                    <p
-                                                        class="text-sm font-semibold mb-2 text-slate-700"
-                                                    >
-                                                        Økt 1:
-                                                    </p>
-                                                    <p
-                                                        class="text-sm text-slate-600 italic mb-3 pb-3 border-b border-violet-200"
-                                                    >
-                                                        Ingen andre har denne økten.
-                                                    </p>
-                                                {/if}
-
-                                                {#if fellesUtovere2.length > 0}
-                                                    <p
-                                                        class="text-sm font-semibold mb-2 text-slate-700"
-                                                    >
-                                                        Økt 2:
-                                                    </p>
-                                                    <div
-                                                        class="flex flex-wrap gap-2"
-                                                    >
-                                                        {#each fellesUtovere2 as utover}
-                                                            <div
-                                                                class="bg-white px-3 py-1 rounded-full text-sm font-medium text-violet-700 border border-violet-200"
-                                                            >
-                                                                {utover}
-                                                            </div>
-                                                        {/each}
-                                                    </div>
-                                                {:else}
-                                                    <p
-                                                        class="text-sm font-semibold mb-2 text-slate-700"
-                                                    >
-                                                        Økt 2:
-                                                    </p>
-                                                    <p
-                                                        class="text-sm text-slate-600 italic"
-                                                    >
-                                                        Ingen andre har denne økten.
-                                                    </p>
-                                                {/if}
-                                            {:else if fellesUtovere1.length > 0}
-                                                <div class="flex flex-wrap gap-2">
-                                                    {#each fellesUtovere1 as utover}
-                                                        <div
-                                                            class="bg-white px-3 py-1 rounded-full text-sm font-medium text-violet-700 border border-violet-200"
-                                                        >
-                                                            {utover}
-                                                        </div>
-                                                    {/each}
-                                                </div>
-                                            {:else}
-                                                <p
-                                                    class="text-sm text-slate-600 italic"
-                                                >
-                                                    Ingen andre er satt opp med denne økten.
-                                                </p>
-                                            {/if}
-                                        </div>
-                                    {/if}
-                                {/if}
-                            </div>
-                        </div>
-                    {/each}
+            {#if isAdmin}
+                <div class="mt-3 flex gap-2">
+                    <input type="text" bind:value={currentUtoverNavn}
+                        on:keydown={(e) => { if (e.key === "Enter") searchUtoverByName(); }}
+                        placeholder="Søk etter utøver…"
+                        class="flex-1 rounded-full bg-[#A9D6E5]/50 border-0 px-4 py-2 text-[#19747E] placeholder-[#19747E] text-sm focus:ring-2 focus:ring-[#19747E] outline-none transition" />
+                    <button on:click={searchUtoverByName} disabled={isLoading || !currentUtoverNavn.trim()}
+                        class="bg-[#A9D6E5]/50 hover:bg-[#A9D6E5] text-[#19747E] rounded-full px-4 py-2 text-sm font-semibold transition disabled:opacity-50">
+                        {isLoading ? "…" : "Søk"}
+                    </button>
+                </div>
+                {#if loginError}
+                    <div class="mt-2 rounded-lg bg-red-500/80 text-white text-sm px-3 py-2">{loginError}</div>
                 {/if}
             {/if}
+        </div>
+    </header>
 
-            {#if view === VIEWS.TECHNIQUE}
-                <div class="mt-8 mb-12 mx-auto max-w-6xl px-1 sm:px-4">
-                    <h2
-                        class="mb-6 text-3xl font-bold text-center text-violet-700"
-                    >
-                        Teknikkvideoer
-                    </h2>
+    <!-- MAIN -->
+    <main class="mx-auto max-w-5xl px-4 py-6 space-y-8">
 
-                    <div class="space-y-4">
-                        <!-- Klassisk -->
-                        <details
-                            class="group bg-white rounded-2xl shadow-lg border border-violet-500 overflow-hidden"
+        <!-- MINE TRENINGSØKTER -->
+        <section>
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="text-base font-bold text-[#19747E]">Mine Treningsøkter:</h2>
+                <span class="text-xs font-bold text-[#A9D6E5] px-2.5 py-1 tracking-wide">UKE {currentWeekNum}</span>
+            </div>
+
+            <!-- Card scroll row with arrow buttons inside -->
+            <div class="relative">
+                <div bind:this={cardScrollEl}
+                    class="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory"
+                    style="scrollbar-width:none; -webkit-overflow-scrolling:touch;">
+
+                    <!-- Left: extend back in time – only visible at the far left end -->
+                    <button on:click={extendCardBack}
+                        class="flex-shrink-0 snap-start self-center w-10 h-10 flex items-center justify-center bg-white border border-slate-200 hover:border-[#19747E] hover:text-[#19747E]/80 text-slate-400 rounded-xl shadow-sm transition-colors">
+                        <ChevronLeft class="h-6 w-6" />
+                    </button>
+
+                    {#each cardDays as day}
+                        {@const dayIso = format(day, "yyyy-MM-dd")}
+                        {@const dw = workouts.filter(w => w.date === dayIso)}
+                        {@const isT = isSameDay(day, today)}
+                        {@const isAct = isSameDay(day, activeDate)}
+                        {@const isRest = dw.length === 0 || dw.every(w => w.title.toLowerCase().includes("hvile"))}
+                        {@const hasComment = dw.some(w => w.description && w.description.trim().length > 0)}
+                        {@const isDouble = dw.length >= 2}
+
+                        <button
+                            class="flex-shrink-0 snap-start w-36 rounded-2xl p-3 text-left transition-all duration-150 flex flex-col
+                                {isT
+                                    ? 'bg-[#D1E8E2] border-2 border-[#19747E]'
+                                    : isAct
+                                        ? 'bg-white border-2 border-[#19747E]'
+                                        : 'bg-white border border-slate-200 hover:border-[#19747E]'}"
+                            on:click={() => {
+                                selectedDate = startOfDay(day);
+                                if (dw.length > 0) openSessionDetail(dayIso, dw);
+                                else { selectedSessionGroup = null; activeModal = null; }
+                            }}
                         >
-                            <summary
-                                class="cursor-pointer px-6 py-4 text-xl font-bold text-violet-700 hover:bg-violet-50 group-open:bg-violet-50 transition-colors flex items-center justify-between"
-                            >
-                                Klassisk
-                                <ChevronDown
-                                    class="h-5 w-5 transition-transform group-open:rotate-180 duration-700 ease-out"
-                                />
-                            </summary>
-
-                            <div class="px-1 sm:px-6 pb-6 space-y-4">
-                                <!-- Diagonal -->
-                                <details class="group/sub bg-white rounded-2xl mt-4 overflow-hidden">
-                                    <summary class="cursor-pointer px-2 sm:px-4 py-3 text-lg font-semibold text-violet-700 hover:bg-violet-50 group-open/sub:border-b-violet-500 group-open/sub:border-b-2 transition-colors flex items-center gap-2 rounded-sm">
-                                        Diagonal
-                                            <ChevronDown class="h-5 w-5 stroke-[2.5] transition-transform group-open/sub:rotate-180 duration-700 ease-out" />
-                                    </summary>
-                                    <div class="p-1 sm:p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div
-                                            class="bg-white rounded-xl shadow overflow-hidden"
-                                        >
-                                            <div class="aspect-video">
-                                                <iframe
-                                                    class="w-full h-full"
-                                                    src="https://www.youtube.com/embed/Z2oNfG4eulQ?si=K3hgPIcHR19j3CUx"
-                                                    title="YouTube video player"
-                                                    frameborder="0"
-                                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                                                    referrerpolicy="strict-origin-when-cross-origin"
-                                                    allowfullscreen
-                                                ></iframe>
-                                            </div>
-                                        </div>
-
-                                        <div
-                                            class="bg-white rounded-xl shadow overflow-hidden"
-                                        >
-                                            <div class="aspect-video">
-                                                <iframe
-                                                    class="w-full h-full"
-                                                    src="https://www.youtube.com/embed/NNR6YpFA7Jw?si=i19W-qDQ-Rv-4TDG" 
-                                                    title="YouTube video player"
-                                                    frameborder="0"
-                                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                                                    referrerpolicy="strict-origin-when-cross-origin"
-                                                    allowfullscreen
-                                                ></iframe>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </details>
-
-                                <!-- Staking -->
-                                <details class="group/sub bg-white rounded-2xl overflow-hidden">
-                                    <summary class="cursor-pointer px-2 sm:px-4 py-3 text-lg font-semibold text-violet-700 hover:bg-violet-50 group-open/sub:border-b-violet-500 group-open/sub:border-b-2 transition-colors flex items-center gap-2 rounded-sm">
-                                        Staking
-                                            <ChevronDown class="h-5 w-5 stroke-[2.5] transition-transform group-open/sub:rotate-180 duration-700 ease-out" />
-                                    </summary>
-                                    <div class="p-1 sm:p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div
-                                            class="bg-white rounded-xl shadow overflow-hidden"
-                                        >
-                                            <div class="aspect-video">
-                                                <iframe
-                                                    class="w-full h-full"
-                                                    src="https://www.youtube.com/embed/D_hlp-buPhA?si=dDlDK1h5lWddEDzN"
-                                                    title="YouTube video player"
-                                                    frameborder="0"
-                                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                                                    referrerpolicy="strict-origin-when-cross-origin"
-                                                    allowfullscreen
-                                                ></iframe>
-                                            </div>
-                                        </div>
-
-                                        <div
-                                            class="bg-white rounded-xl shadow overflow-hidden"
-                                        >
-                                            <div class="aspect-video">
-                                                <iframe
-                                                    class="w-full h-full"
-                                                    src="https://www.youtube.com/embed/MYVK4agNPcE?si=5L52ljY36n9Z1MZH"
-                                                    title="YouTube video player"
-                                                    frameborder="0"
-                                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                                                    referrerpolicy="strict-origin-when-cross-origin"
-                                                    allowfullscreen
-                                                ></iframe>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </details>
-
-                                <!-- Dobbeltak med fraspark -->
-                                <details class="group/sub bg-white rounded-2xl overflow-hidden">
-                                    <summary class="cursor-pointer px-2 sm:px-4 py-3 text-lg font-semibold text-violet-700 hover:bg-violet-50 group-open/sub:border-b-violet-500 group-open/sub:border-b-2 transition-colors flex items-center gap-2 rounded-sm">
-                                        Dobbeltak med fraspark
-                                            <ChevronDown class="h-5 w-5 stroke-[2.5] transition-transform group-open/sub:rotate-180 duration-700 ease-out" />
-                                    </summary>
-                                    <div class="p-1 sm:p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div
-                                            class="bg-white rounded-xl shadow overflow-hidden"
-                                        >
-                                            <div class="aspect-video">
-                                                <iframe
-                                                    class="w-full h-full"
-                                                    src="https://www.youtube.com/embed/7SZn1vDG_WY?si=obHl2RpMR8ByMgfz"
-                                                    title="YouTube video player"
-                                                    frameborder="0"
-                                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                                                    referrerpolicy="strict-origin-when-cross-origin"
-                                                    allowfullscreen
-                                                ></iframe>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </details>
-                            </div>
-                        </details>
-
-                        <!-- Skøyting -->
-                        <details
-                            class="group bg-white rounded-2xl shadow-lg border border-violet-500 overflow-hidden"
-                        >
-                            <summary
-                                class="cursor-pointer px-6 py-4 text-xl font-bold text-violet-700 hover:bg-violet-50 group-open:bg-violet-50 transition-colors flex items-center justify-between"
-                            >
-                                Skøyting
-                                <ChevronDown
-                                    class="h-5 w-5 transition-transform group-open:rotate-180 duration-700 ease-out"
-                                />
-                            </summary>
-
-                            <div class="0 sm:px-6 pb-6 space-y-4">
-                                <!-- Dobbeldans -->
-                                <details class="group/sub bg-white rounded-2xl mt-4 overflow-hidden">
-                                    <summary class="cursor-pointer px-2 sm:px-4 py-3 text-lg font-semibold text-violet-700 hover:bg-violet-50 group-open/sub:border-b-violet-500 group-open/sub:border-b-2 transition-colors flex items-center gap-2 rounded-sm">
-                                        Dobbeldans
-                                            <ChevronDown class="h-5 w-5 stroke-[2.5] transition-transform group-open/sub:rotate-180 duration-700 ease-out" />
-                                    </summary>
-                                    <div class="p-1 sm:p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div
-                                            class="bg-white rounded-xl shadow overflow-hidden"
-                                        >
-                                            <div class="aspect-video">
-                                                <iframe
-                                                    class="w-full h-full"
-                                                    src="https://www.youtube.com/embed/PlFkOEr7bw0?si=qVwizVGKQVB6ixoA"
-                                                    title="YouTube video player"
-                                                    frameborder="0"
-                                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                                                    referrerpolicy="strict-origin-when-cross-origin"
-                                                    allowfullscreen
-                                                ></iframe>
-                                            </div>
-                                        </div>
-
-                                        <div
-                                            class="bg-white rounded-xl shadow overflow-hidden"
-                                        >
-                                            <div class="aspect-video">
-                                                <iframe
-                                                    class="w-full h-full"
-                                                    src="https://www.youtube.com/embed/G-vIb6gzYRk?si=I7mpCV1p-j7vSKv_" 
-                                                    title="YouTube video player"
-                                                    frameborder="0"
-                                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                                                    referrerpolicy="strict-origin-when-cross-origin"
-                                                    allowfullscreen
-                                                ></iframe>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </details>
-
-                                <!-- Padling -->
-                                <details class="group/sub bg-white rounded-2xl overflow-hidden">
-                                    <summary class="cursor-pointer px-2 sm:px-4 py-3 text-lg font-semibold text-violet-700 hover:bg-violet-50 group-open/sub:border-b-violet-500 group-open/sub:border-b-2 transition-colors flex items-center gap-2 rounded-sm">
-                                        Padling
-                                            <ChevronDown class="h-5 w-5 stroke-[2.5] transition-transform group-open/sub:rotate-180 duration-700 ease-out" />
-                                    </summary>
-                                    <div class="p-1 sm:p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div
-                                            class="bg-white rounded-xl shadow overflow-hidden"
-                                        >
-                                            <div class="aspect-video">
-                                                <iframe
-                                                    class="w-full h-full"
-                                                    src="https://www.youtube.com/embed/Z6ynMU7KixA?si=Av9HKthu8O9wEXGm"
-                                                    title="YouTube video player"
-                                                    frameborder="0"
-                                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                                                    referrerpolicy="strict-origin-when-cross-origin"
-                                                    allowfullscreen
-                                                ></iframe>
-                                            </div>
-                                        </div>
-
-                                        <div
-                                            class="bg-white rounded-xl shadow overflow-hidden"
-                                        >
-                                            <div class="aspect-video">
-                                                <iframe
-                                                    class="w-full h-full"
-                                                    src="https://www.youtube.com/embed/-eWpFQ9rDos?si=7QZpyucS4EGulPl7" 
-                                                    title="YouTube video player"
-                                                    frameborder="0"
-                                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                                                    referrerpolicy="strict-origin-when-cross-origin"
-                                                    allowfullscreen
-                                                ></iframe>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </details>
-
-                                <!-- Enkeldans -->
-                                <details class="group/sub bg-white rounded-2xl overflow-hidden">
-                                    <summary class="cursor-pointer px-2 sm:px-4 py-3 text-lg font-semibold text-violet-700 hover:bg-violet-50 group-open/sub:border-b-violet-500 group-open/sub:border-b-2 transition-colors flex items-center gap-2 rounded-sm">
-                                        Enkeldans
-                                            <ChevronDown class="h-5 w-5 stroke-[2.5] transition-transform group-open/sub:rotate-180 duration-700 ease-out" />
-                                    </summary>
-                                    <div class="p-1 sm:p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div
-                                            class="bg-white rounded-xl shadow overflow-hidden"
-                                        >
-                                            <div class="aspect-video">
-                                                <iframe
-                                                    class="w-full h-full"
-                                                    src="https://www.youtube.com/embed/8PLC-KWs4c0?si=pk7x-OE3AfzP6xfh" 
-                                                    title="YouTube video player"
-                                                    frameborder="0"
-                                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                                                    referrerpolicy="strict-origin-when-cross-origin"
-                                                    allowfullscreen
-                                                ></iframe>
-                                            </div>
-                                        </div>
-
-                                        <div
-                                            class="bg-white rounded-xl shadow overflow-hidden"
-                                        >
-                                            <div class="aspect-video">
-                                                <iframe
-                                                    class="w-full h-full"
-                                                    src="https://www.youtube.com/embed/QWZp2WVukkY?si=LTEtEeruo-R8zkWa"
-                                                    title="YouTube video player"
-                                                    frameborder="0"
-                                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                                                    referrerpolicy="strict-origin-when-cross-origin"
-                                                    allowfullscreen
-                                                ></iframe>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </details>
-                            </div>
-                        </details>
-                    </div>
-                </div>
-            {/if}
-
-            {#if view === VIEWS.STATISTICS}
-                <div class="mt-8 mb-12 mx-auto max-w-4xl">
-                    <h2 class="mb-6 text-3xl font-bold text-center text-violet-700">
-                        Treningsstatistikk
-                    </h2>
-
-                    <!-- Periode-velger -->
-                    <div class="mb-6 flex flex-col sm:flex-row gap-4 items-stretch sm:items-center justify-between">
-                        <!-- Periode-type velger -->
-                        <div class="relative flex bg-slate-200 rounded-full w-full md:w-[300px]" style="padding: 0.175rem;">
-                            <div
-                                class="absolute bg-violet-600 rounded-full shadow-sm transition-all duration-500"
-                                style={`top: 0.175rem; left: 0.175rem; height: calc(100% - 0.35rem); width: calc(33.333% - 0.38rem); transform: translateX(${
-                                    statsPeriod === "week" ? "0" :
-                                    statsPeriod === "month" ? "calc(100% + 0.35rem)" :
-                                    "calc(200% + 0.7rem)"
-                                });`}
-                            ></div>
-
-                            <button
-                                on:click={() => statsPeriod = "week"}
-                                class={`relative z-10 w-1/3 text-sm font-medium py-2 px-4 transition-colors ${
-                                    statsPeriod === "week" ? "text-white" : "text-slate-700 hover:text-violet-700"
-                                }`}
-                            >
-                                Uke
-                            </button>
-                            <button
-                                on:click={() => statsPeriod = "month"}
-                                class={`relative z-10 w-1/3 text-sm font-medium py-2 px-4 transition-colors ${
-                                    statsPeriod === "month" ? "text-white" : "text-slate-700 hover:text-violet-700"
-                                }`}
-                            >
-                                Måned
-                            </button>
-                            <button
-                                on:click={() => statsPeriod = "year"}
-                                class={`relative z-10 w-1/3 text-sm font-medium py-2 px-4 transition-colors ${
-                                    statsPeriod === "year" ? "text-white" : "text-slate-700 hover:text-violet-700"
-                                }`}
-                            >
-                                Sesong
-                            </button>
-                        </div>
-
-                        <!-- Navigering -->
-                        <div class="flex items-center gap-2 justify-center sm:justify-end">
-                            <button
-                                on:click={() => changePeriod("prev")}
-                                class="border border-slate-300 rounded-xl p-2 hover:bg-slate-50 transition-colors"
-                                aria-label="Forrige periode"
-                            >
-                                <ChevronLeft class="h-5 w-5" />
-                            </button>
-                            
-                            <div class="min-w-[200px] text-center">
-                                <p class="text-lg font-semibold text-slate-800">
-                                    {getPeriodLabel(statsPeriod, statsStartDate)}
-                                </p>
+                            <!-- Date row -->
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs font-semibold capitalize {isT ? 'text-[#19747E]' : 'text-[#A9D6E5]'}">
+                                    {isT ? "I dag" : format(day, "EEE", { locale: nb })}
+                                </span>
+                                <span class="text-xs font-bold {isT ? 'text-[#19747E]' : 'text-[#A9D6E5]'}">{format(day, "dd.MM")}</span>
                             </div>
 
-                            <button
-                                on:click={() => changePeriod("next")}
-                                class="border border-slate-300 rounded-xl p-2 hover:bg-slate-50 transition-colors"
-                                aria-label="Neste periode"
-                            >
-                                <ChevronRight class="h-5 w-5" />
-                            </button>
-
-                            <!-- LEGG TIL KALENDERKNAPP -->
-                            <button
-                                on:click={openStatsCalendar}
-                                class="border border-violet-300 bg-violet-50 rounded-xl p-2 hover:bg-violet-100 transition-colors"
-                                aria-label="Velg dato"
-                            >
-                                <Calendar class="h-5 w-5 text-violet-600" />
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Statistikk-kort -->
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-                        <!-- Hardøkter -->
-                        <div class="bg-white rounded-2xl border-2 border-red-200 p-6 shadow-sm">
-                            <div class="flex items-center gap-3 mb-2">
-                                <div class="bg-red-100 rounded-xl p-3">
-                                    <Timer class="h-6 w-6 text-red-700" />
-                                </div>
-                                <div>
-                                    <p class="text-3xl font-bold text-red-700">{stats.hardOkter}</p>
-                                    <p class="text-sm text-slate-600">Hardøkter</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Langturer -->
-                        <div class="bg-white rounded-2xl border-2 border-cyan-200 p-6 shadow-sm">
-                            <div class="flex items-center gap-3 mb-2">
-                                <div class="bg-cyan-100 rounded-xl p-3">
-                                    <Heart class="h-6 w-6 text-cyan-800" />
-                                </div>
-                                <div>
-                                    <p class="text-3xl font-bold text-cyan-800">{stats.langtur}</p>
-                                    <p class="text-sm text-slate-600">Langturer</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Styrkeøkter -->
-                        <div class="bg-white rounded-2xl border-2 border-yellow-200 p-6 shadow-sm">
-                            <div class="flex items-center gap-3 mb-2">
-                                <div class="bg-yellow-100 rounded-xl p-3">
-                                    <Dumbbell class="h-6 w-6 text-yellow-800" />
-                                </div>
-                                <div>
-                                    <p class="text-3xl font-bold text-yellow-800">{stats.styrke}</p>
-                                    <p class="text-sm text-slate-600">Styrkeøkter</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Hviledager -->
-                        <div class="bg-white rounded-2xl border-2 border-green-200 p-6 shadow-sm">
-                            <div class="flex items-center gap-3 mb-2">
-                                <div class="bg-green-100 rounded-xl p-3">
-                                    <BatteryCharging class="h-6 w-6 text-green-800" />
-                                </div>
-                                <div>
-                                    <p class="text-3xl font-bold text-green-800">{stats.hvile}</p>
-                                    <p class="text-sm text-slate-600">Hviledager</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Totalt antall økter -->
-                        <div class="bg-white rounded-2xl border-2 border-violet-200 p-6 shadow-sm">
-                            <div class="flex items-center gap-3 mb-2">
-                                <div class="bg-violet-100 rounded-xl p-3">
-                                    <Calendar class="h-6 w-6 text-violet-700" />
-                                </div>
-                                <div>
-                                    <p class="text-3xl font-bold text-violet-700">{stats.totalEconomic}</p>
-                                    <p class="text-sm text-slate-600">Totalt økter</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Total treningstid -->
-                        <div class="bg-white rounded-2xl border-2 border-violet-200 p-6 shadow-sm">
-                            <div class="flex items-center gap-3 mb-2">
-                                <div class="bg-violet-100 rounded-xl p-3">
-                                    <Clock class="h-6 w-6 text-violet-700" />
-                                </div>
-                                <div>
-                                    <p class="text-3xl font-bold text-violet-700">
-                                        {stats.totalHours}t {#if stats.totalMins > 0} {stats.totalMins.toString().padStart(2, '0')}min {/if}
-                                    </p>
-                                    <p class="text-sm text-slate-600">Timer totalt</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Detaljert liste over økter i perioden -->
-                    <div class="bg-white rounded-2xl border border-slate-200 p-3 shadow-sm">
-                        <h3 class="text-xl font-bold text-slate-800 mb-4">
-                            Økter i perioden
-                        </h3>
-                        
-                        {#if periodWorkouts.length === 0}
-                            <p class="text-slate-600 italic">Ingen økter registrert i denne perioden.</p>
-                        {:else}
-                            <div class="space-y-2 max-h-96 overflow-y-auto">
-                                {#each groupByDate(periodWorkouts.sort((a, b) => a.date.localeCompare(b.date))) as g}
-                                    <div class="border border-slate-200 rounded-xl p-3">
-                                        <p class="text-sm md:text-lg font-semibold text-slate-700 mb-2">
-                                            {format(parseISO(g.date), "EEEE d. MMMM", { locale: nb })}
+                            {#if dw.length > 0}
+                                <!-- Movement-form heading(s): UPPERCASE ITALIC -->
+                                <div class="mb-2">
+                                    {#each dw as w, wi}
+                                        <p class="text-sm font-bold italic uppercase leading-tight {isT ? 'text-[#19747E]' : 'text-[#A9D6E5]'}">
+                                            {getCardTitle(w.title)}{wi === 0 && isDouble ? " +" : ""}
                                         </p>
-                                        <div class="space-y-1">
-                                            {#each g.sessions as s}
-                                                {@const info = getWorkoutInfo(s.title)}
-                                                <div class="flex items-center gap-2 text-xs md:text-sm">
-                                                    <div class={`px-2 py-1 rounded-lg ${info.color} font-medium flex items-center gap-1`}>
-                                                        <svelte:component this={info.icon} class="h-4 w-4" />
-                                                        {s.title}
-                                                    </div>
-                                                    {#if s.durationMin}
-                                                    <Clock class="text-slate-500 h-4 w-4" />
-                                                    <span class="text-slate-600">
-                                                            {formatTime(s.durationMin)}
-                                                    </span>
-                                                    {/if}
-                                                </div>
-                                            {/each}
-                                        </div>
+                                    {/each}
+                                </div>
+
+                                <!-- Icons — no background -->
+                                <div class="flex gap-1.5 flex-wrap mb-2">
+                                    {#each dw as w}
+                                        {@const info = getWorkoutInfo(w.title)}
+                                        <svelte:component this={info.icon} class="h-6 w-6 {isT ? 'text-[#19747E]' : 'text-[#A9D6E5]'}" />
+                                    {/each}
+                                </div>
+
+                                <!-- Full workout names -->
+                                <div class="flex flex-col {isDouble ? 'gap-2' : 'gap-0.5'} flex-1">
+                                    {#each dw as w}
+                                        <p class="text-xs leading-snug {isT ? 'text-[#19747E]' : 'text-[#A9D6E5]'}">{w.title}</p>
+                                    {/each}
+                                </div>
+
+                                <!-- Footer: only on non-rest days -->
+                                {#if !isRest}
+                                    <div class="flex items-center justify-between pt-1.5 mt-3 border-t {isT ? 'text-[#19747E]' : 'text-[#A9D6E5]'}">
+                                        <span class="flex items-center gap-0.5 text-xs font-semibold {isT ? 'text-[#19747E]' : 'text-[#A9D6E5]'}">
+                                            <User class="h-3 w-3" /> {fellesCountByDay.get(dayIso) ?? 0}
+                                        </span>
+                                        {#if hasComment}
+                                            <span class="{isT ? 'text-[#19747E]' : 'text-[#A9D6E5]'}">
+                                                <MessageSquare class="h-3.5 w-3.5" />
+                                            </span>
+                                        {:else}
+                                            <span></span>
+                                        {/if}
                                     </div>
+                                {/if}
+                            {:else}
+                            <div class="flex-1 flex flex-col items-center justify-center gap-1 text-center px-1 {isT ? 'text-[#19747E]/30' : 'text-slate-300'}">
+                                <span class="text-xs leading-tight">Ingen økt er lagt inn enda…</span>
+                            </div>
+                            {/if}
+                        </button>
+                    {/each}
+
+                    <!-- Right: extend forward in time – only visible at the far right end -->
+                    <button on:click={extendCardForward}
+                        class="flex-shrink-0 snap-start self-center w-10 h-10 flex items-center justify-center bg-white border border-slate-200 hover:border-[#19747E] hover:text-[#19747E]/80 text-slate-400 rounded-xl shadow-sm transition-colors">
+                        <ChevronRight class="h-6 w-6" />
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- STATISTIKK -->
+        <section>
+            <div class="mb-3">
+                <h2 class="text-base font-bold text-[#19747E] mb-2">Statistikk:</h2>
+                <div class="flex items-center gap-2">
+                    <!-- Prev / Next navigation -->
+                    <button on:click={prevStatPeriod}
+                        class="bg-white border border-slate-200 hover:border-[#19747E] text-slate-400 hover:text-[#19747E] rounded-lg p-1.5 transition-colors">
+                        <ChevronLeft class="h-4 w-4" />
+                    </button>
+
+                    <!-- Period dropdown -->
+                    <div class="relative">
+                        <button on:click={() => showStatDropdown = !showStatDropdown}
+                            class="flex items-center gap-1.5 bg-white border border-slate-200 hover:border-[#19747E] rounded-lg px-3 py-1.5 text-sm font-semibold text-[#19747E] transition-colors min-w-[130px] justify-between">
+                            <span class="capitalize">{statPeriodLabel}</span>
+                            <ChevronDown class="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+                        </button>
+                        {#if showStatDropdown}
+                            <div class="absolute left-0 top-full mt-1 z-30 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden min-w-[120px]">
+                                {#each [["uke","Uke"],["maaned","Måned"],["sesong","Sesong"]] as [val, lbl]}
+                                    <button on:click={() => setPeriod(val)}
+                                        class="w-full text-left px-4 py-2.5 text-sm font-semibold transition-colors {statPeriod === val ? 'bg-[#19747E] text-white' : 'text-slate-600 hover:bg-slate-50'}">
+                                        {lbl}
+                                    </button>
                                 {/each}
                             </div>
                         {/if}
                     </div>
+
+                    <button on:click={nextStatPeriod}
+                        class="bg-white border border-slate-200 hover:border-[#19747E] text-slate-400 hover:text-[#19747E] rounded-lg p-1.5 transition-colors">
+                        <ChevronRight class="h-4 w-4" />
+                    </button>
+
+                    <!-- Calendar picker button -->
+                    <button on:click={openStatCalendar}
+                        class="bg-white border border-slate-200 hover:border-[#19747E] text-slate-400 hover:text-[#19747E] rounded-lg p-1.5 transition-colors">
+                        <Calendar class="h-4 w-4" />
+                    </button>
                 </div>
-                <!-- Kalenderdialog -->
-                {#if showStatsCalendar}
-                    <div 
-                        class="fixed bg-white/80 inset-0 z-50 flex items-center justify-center p-4"
-                        on:click={closeStatsCalendar}
-                        on:keydown={(e) => e.key === 'Escape' && closeStatsCalendar()}
-                        role="button"
-                        tabindex="0"
-                    >
-                        <div 
-                            class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6"
-                            on:click|stopPropagation
-                            role="dialog"
-                            aria-modal="true"
-                        >
-                            <div class="flex justify-between items-center mb-4">
-                                <h3 class="text-xl font-bold text-slate-800">
-                                    Velg {statsPeriod === "week" ? "uke" : statsPeriod === "month" ? "måned" : "sesong"}
-                                </h3>
-                                <button
-                                    on:click={closeStatsCalendar}
-                                    class="text-slate-400 hover:text-slate-600 transition-colors"
-                                    aria-label="Lukk"
-                                >
-                                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                                    </svg>
-                                </button>
+            </div>
+
+            <!-- Stat Calendar Picker -->
+            {#if showStatCalendar}
+                <div class="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm"
+                    on:click={() => showStatCalendar = false}
+                    role="button" tabindex="0"
+                    on:keydown={(e) => e.key === "Escape" && (showStatCalendar = false)} aria-label="Lukk">
+                    <div class="bg-white w-full max-w-xs rounded-3xl p-5 shadow-2xl"
+                        on:click|stopPropagation role="dialog" aria-modal="true">
+                        <div class="flex justify-end mb-2">
+                            <button on:click={() => showStatCalendar = false}
+                                class="bg-slate-100 hover:bg-slate-200 rounded-lg p-1.5 text-slate-500 transition-colors">
+                                <X class="h-5 w-5" />
+                            </button>
+                        </div>
+                        <div class="flex items-center justify-between mb-4">
+                            <button on:click={() => { statCalendarCursor = subMonths(statCalendarCursor, 1); updateStatCalendarDays(); }}
+                                class="bg-slate-100 hover:bg-[#A9D6E5] rounded-xl p-2 transition-colors">
+                                <ChevronLeft class="h-4 w-4 text-[#19747E]" />
+                            </button>
+                            <h3 class="font-bold text-slate-800 capitalize">{format(statCalendarCursor, "MMMM yyyy", { locale: nb })}</h3>
+                            <button on:click={() => { statCalendarCursor = addMonths(statCalendarCursor, 1); updateStatCalendarDays(); }}
+                                class="bg-slate-100 hover:bg-[#A9D6E5] rounded-xl p-2 transition-colors">
+                                <ChevronRight class="h-4 w-4 text-[#19747E]" />
+                            </button>
+                        </div>
+                        <div class="grid grid-cols-7 gap-1 mb-1">
+                            {#each ["Ma","Ti","On","To","Fr","Lø","Sø"] as d}
+                                <div class="text-center text-xs font-bold text-slate-400 py-1">{d}</div>
+                            {/each}
+                        </div>
+                        <div class="grid grid-cols-7 gap-1">
+                            {#each statCalendarDays as d}
+                                {#if d}
+                                    {@const isT = isSameDay(d, today)}
+                                    {@const isSel = isSameDay(d, statAnchor)}
+                                    <button on:click={() => selectStatCalendarDate(d)}
+                                        class="aspect-square rounded-lg text-sm flex items-center justify-center transition-colors
+                                            {isSel ? 'bg-[#19747E] text-white font-bold' : isT ? 'bg-[#A9D6E5] text-[#19747E] font-bold' : 'hover:bg-slate-100 text-slate-700'}">
+                                        {format(d, "d")}
+                                    </button>
+                                {:else}
+                                    <div></div>
+                                {/if}
+                            {/each}
+                        </div>
+                        <button on:click={() => selectStatCalendarDate(today)}
+                            class="w-full mt-4 py-2.5 rounded-xl border border-[#19747E] bg-[#D1E8E2] text-[#19747E] text-sm font-semibold transition-colors">
+                            Gå til i dag
+                        </button>
+                    </div>
+                </div>
+            {/if}
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <!-- BAR CHART -->
+                <div class="bg-white rounded-2xl border border-slate-200 p-4">
+                    <svg viewBox="0 0 272 110" class="w-full pb-3">
+                        {#each [0.33, 0.66, 1] as frac}
+                            <line x1="18" y1={90 - frac * 70} x2="260" y2={90 - frac * 70} stroke="#E2E8F0" stroke-width="0.7"/>
+                            <text x="16" y={90 - frac * 70 + 2} font-size="6" fill="#94A3B8" text-anchor="end">{Math.round(frac * barMaxV)}</text>
+                        {/each}
+                        {#each barChartItems as item}
+                            <rect x={item.x+1} y={item.y+1} width={item.bw} height={item.bh} fill="rgba(0,0,0,0.05)" rx="5"/>
+                            <rect x={item.x} y={item.y} width={item.bw} height={item.bh} fill={item.barColor} rx="5"/>
+                            <text x={item.x + item.bw/2} y={item.y - 3} text-anchor="middle" font-size="8" font-weight="700" fill={item.barColor}>{item.value}</text>
+                            <text x={item.x + item.bw/2} y="106" text-anchor="middle" font-size="6.5" fill="#64748B" transform={`rotate(-28, ${item.x + item.bw/2}, 106)`}>{item.label}</text>
+                        {/each}
+                        <line x1="18" y1="90" x2="260" y2="90" stroke="#CBD5E1" stroke-width="0.8"/>
+                    </svg>
+                    <!-- Antall økter at the bottom -->
+                    <div class="text-center pt-2 border-t border-slate-100">
+                        <span class="text-sm text-slate-500 font-medium ml-1.5">Antall økter: </span>
+                        <span class="text-md font-bold text-[#19747E]">{barStats.total}</span>
+                    </div>
+                </div>
+
+                <!-- LINE CHART -->
+                <div class="bg-white rounded-2xl border border-slate-200 p-4">
+                    {#if lineChartData.length > 1}
+                        <svg viewBox="0 0 272 110" class="w-full"
+                            on:mouseleave={() => lineTooltip = null}
+                            on:click={() => lineTooltip = null}>
+                            <defs>
+                                <linearGradient id="lg" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stop-color="#0F766E" stop-opacity="0.25"/>
+                                    <stop offset="100%" stop-color="#0F766E" stop-opacity="0.02"/>
+                                </linearGradient>
+                            </defs>
+                            <path d={lineArea} fill="url(#lg)"/>
+                            {#each lineYTicks as tick}
+                                {@const ty = 82 - (tick / lineMaxCeil) * 62}
+                                <line x1="28" y1={ty} x2="258" y2={ty} stroke="#E2E8F0" stroke-width="0.7"/>
+                                <text x="26" y={ty + 2} font-size="6" fill="#94A3B8" text-anchor="end">{tick}t</text>
+                            {/each}
+                            <polyline points={linePoly} fill="none" stroke="#0F766E" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+                            {#each linePts as p}
+                                <!-- Invisible wider hit area -->
+                                <circle cx={p.x} cy={p.y} r="10" fill="transparent"
+                                    on:mouseenter={() => lineTooltip = p}
+                                    on:mouseleave={() => lineTooltip = null}
+                                    on:click|stopPropagation={() => lineTooltip = p}
+                                    class="cursor-pointer" />
+                                <circle cx={p.x} cy={p.y} r={lineTooltip?.label === p.label ? 4.5 : 3}
+                                    fill="white" stroke="#0F766E"
+                                    stroke-width={lineTooltip?.label === p.label ? 2.5 : 1.5}
+                                    style="transition: r 0.1s, stroke-width 0.1s; pointer-events: none;" />
+                                <text x={p.x} y="108" text-anchor="middle" font-size="6.5" fill="#64748B">{p.label}</text>
+                            {/each}
+                            <!-- Tooltip bubble -->
+                            <line x1="28" y1="88" x2="258" y2="88" stroke="#CBD5E1" stroke-width="0.8"/>
+                            <!-- Tooltip bubble – rendered last so it's always on top -->
+                            {#if lineTooltip}
+                                {@const tx = Math.min(Math.max(lineTooltip.x, 30), 242)}
+                                {@const ty = Math.max(lineTooltip.y - 18, 10)}
+                                {@const totalMin = Math.round(lineTooltip.hours * 60)}
+                                {@const hh = Math.floor(totalMin / 60)}
+                                {@const mm = totalMin % 60}
+                                {@const lbl = hh > 0 && mm > 0 ? `${hh}t ${mm}m` : hh > 0 ? `${hh}t` : `${mm}m`}
+                                <rect x={tx - 16} y={ty - 8} width="32" height="12" rx="4" fill="#0F766E"/>
+                                <text x={tx} y={ty + 1} text-anchor="middle" font-size="6.5" font-weight="700" fill="white">{lbl}</text>
+                            {/if}
+                        </svg>
+                    {:else}
+                        <div class="flex items-center justify-center h-32 text-slate-400 text-sm">Ingen data ennå</div>
+                    {/if}
+                    <!-- Timer totalt at the bottom -->
+                    <div class="text-center mt-1 pt-2 border-t border-slate-100">
+                    <span class="text-sm text-slate-500 font-medium ml-1.5">Timer totalt:</span>
+                        <span class="text-md font-bold text-[#19747E]">{barStats.totalHours}t{barStats.totalMins > 0 ? ` ${barStats.totalMins}min` : ""}</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TEKNIKKVIDEOER -->
+        <section>
+            <h2 class="text-base font-bold text-[#19747E] mb-3">Teknikkvideoer:</h2>
+
+            <div class="flex flex-col gap-3">
+
+                <!-- Klassisk: Diagonal -->
+                <div class="bg-white rounded-2xl border border-slate-200 p-4">
+                    <p class="text-md font-bold text-[#19747E] mb-3">Klassisk: <span class="text-[#A9D6E5] italic"> Diagonal </span> </p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        <div class="rounded-xl overflow-hidden shadow-sm"><div class="aspect-video"><iframe class="w-full h-full" src="https://www.youtube.com/embed/Z2oNfG4eulQ?si=K3hgPIcHR19j3CUx" title="Diagonal" frameborder="0" allowfullscreen></iframe></div></div>
+                        <div class="rounded-xl overflow-hidden shadow-sm"><div class="aspect-video"><iframe class="w-full h-full" src="https://www.youtube.com/embed/NNR6YpFA7Jw?si=i19W-qDQ-Rv-4TDG" title="Diagonal 2" frameborder="0" allowfullscreen></iframe></div></div>
+                    </div>
+                </div>
+
+                <!-- Klassisk: Staking -->
+                <div class="bg-white rounded-2xl border border-slate-200 p-4">
+                    <p class="text-md font-bold text-[#19747E] mb-3">Klassisk: <span class="text-[#A9D6E5] italic"> Staking </span></p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        <div class="rounded-xl overflow-hidden shadow-sm"><div class="aspect-video"><iframe class="w-full h-full" src="https://www.youtube.com/embed/D_hlp-buPhA?si=dDlDK1h5lWddEDzN" title="Staking" frameborder="0" allowfullscreen></iframe></div></div>
+                        <div class="rounded-xl overflow-hidden shadow-sm"><div class="aspect-video"><iframe class="w-full h-full" src="https://www.youtube.com/embed/MYVK4agNPcE?si=5L52ljY36n9Z1MZH" title="Staking 2" frameborder="0" allowfullscreen></iframe></div></div>
+                    </div>
+                </div>
+
+                <!-- Klassisk: Dobbeltak med fraspark -->
+                <div class="bg-white rounded-2xl border border-slate-200 p-4">
+                    <p class="text-md font-bold text-[#19747E] mb-3">Klassisk: <span class="text-[#A9D6E5] italic"> Dobbeltak med fraspark </span></p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        <div class="rounded-xl overflow-hidden shadow-sm"><div class="aspect-video"><iframe class="w-full h-full" src="https://www.youtube.com/embed/7SZn1vDG_WY?si=obHl2RpMR8ByMgfz" title="Dobbeltak" frameborder="0" allowfullscreen></iframe></div></div>
+                    </div>
+                </div>
+
+                <!-- Skøyting: Dobbeldans -->
+                <div class="bg-white rounded-2xl border border-slate-200 p-4">
+                    <p class="text-md font-bold text-[#19747E] mb-3">Skøyting: <span class="text-[#A9D6E5] italic"> Dobbeldans </span></p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        <div class="rounded-xl overflow-hidden shadow-sm"><div class="aspect-video"><iframe class="w-full h-full" src="https://www.youtube.com/embed/PlFkOEr7bw0?si=qVwizVGKQVB6ixoA" title="Dobbeldans" frameborder="0" allowfullscreen></iframe></div></div>
+                        <div class="rounded-xl overflow-hidden shadow-sm"><div class="aspect-video"><iframe class="w-full h-full" src="https://www.youtube.com/embed/G-vIb6gzYRk?si=I7mpCV1p-j7vSKv_" title="Dobbeldans 2" frameborder="0" allowfullscreen></iframe></div></div>
+                    </div>
+                </div>
+
+                <!-- Skøyting: Padling -->
+                <div class="bg-white rounded-2xl border border-slate-200 p-4">
+                    <p class="text-md font-bold text-[#19747E] mb-3">Skøyting: <span class="text-[#A9D6E5] italic"> Padling </span></p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        <div class="rounded-xl overflow-hidden shadow-sm"><div class="aspect-video"><iframe class="w-full h-full" src="https://www.youtube.com/embed/Z6ynMU7KixA?si=Av9HKthu8O9wEXGm" title="Padling" frameborder="0" allowfullscreen></iframe></div></div>
+                        <div class="rounded-xl overflow-hidden shadow-sm"><div class="aspect-video"><iframe class="w-full h-full" src="https://www.youtube.com/embed/-eWpFQ9rDos?si=7QZpyucS4EGulPl7" title="Padling 2" frameborder="0" allowfullscreen></iframe></div></div>
+                    </div>
+                </div>
+
+                <!-- Skøyting: Enkeldans -->
+                <div class="bg-white rounded-2xl border border-slate-200 p-4">
+                    <p class="text-md font-bold text-[#19747E] mb-3">Skøyting: <span class="text-[#A9D6E5] italic"> Enkeldans </span></p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        <div class="rounded-xl overflow-hidden shadow-sm"><div class="aspect-video"><iframe class="w-full h-full" src="https://www.youtube.com/embed/8PLC-KWs4c0?si=pk7x-OE3AfzP6xfh" title="Enkeldans" frameborder="0" allowfullscreen></iframe></div></div>
+                        <div class="rounded-xl overflow-hidden shadow-sm"><div class="aspect-video"><iframe class="w-full h-full" src="https://www.youtube.com/embed/QWZp2WVukkY?si=LTEtEeruo-R8zkWa" title="Enkeldans 2" frameborder="0" allowfullscreen></iframe></div></div>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <div class="h-6"></div>
+    </main>
+
+    <!-- SESSION DETAIL MODAL -->
+    {#if activeModal === "session" && selectedSessionGroup}
+        <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40 backdrop-blur-sm"
+            on:click={() => activeModal = null} role="button" tabindex="0"
+            on:keydown={(e) => e.key === "Escape" && (activeModal = null)} aria-label="Lukk">
+            <div class="bg-white w-full max-w-lg sm:rounded-3xl rounded-t-3xl max-h-[88vh] overflow-y-auto p-5 pb-8 relative sm:mx-4"
+                on:click|stopPropagation role="dialog" aria-modal="true">
+
+                <button on:click={() => activeModal = null}
+                    class="absolute top-4 right-4 bg-slate-100 hover:bg-slate-200 rounded-lg p-1.5 text-slate-500 transition-colors">
+                    <X class="h-5 w-5" />
+                </button>
+
+                <p class="font-bold text-lg text-slate-800 mb-4 capitalize">
+                    {format(parseISO(selectedSessionGroup.date), "EEEE d. MMMM", { locale: nb })}
+                </p>
+
+                {#each selectedSessionGroup.sessions as s}
+                    {@const info = getWorkoutInfo(s.title)}
+                    <div class="rounded-xl p-3.5 mb-3 {info.bg}">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-xl bg-white flex items-center justify-center flex-shrink-0">
+                                <svelte:component this={info.icon} class="h-5 w-5 {info.color}" />
                             </div>
-
-                            <!-- Kalenderhode -->
-                            <div class="flex justify-between items-center mb-4">
-                                <button
-                                    on:click={() => changeStatsCalendarMonth("prev")}
-                                    class="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-                                    aria-label="Forrige måned"
-                                >
-                                    <ChevronLeft class="h-5 w-5" />
-                                </button>
-                                
-                                <h4 class="text-lg font-semibold text-slate-800">
-                                    {format(statsCalendarCursor, "MMMM yyyy", { locale: nb })}
-                                </h4>
-
-                                <button
-                                    on:click={() => changeStatsCalendarMonth("next")}
-                                    class="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-                                    aria-label="Neste måned"
-                                >
-                                    <ChevronRight class="h-5 w-5" />
-                                </button>
-                            </div>
-
-                            <!-- Ukedager -->
-                            <div class="grid grid-cols-7 gap-1 mb-2">
-                                {#each ["Ma", "Ti", "On", "To", "Fr", "Lø", "Sø"] as day}
-                                    <div class="text-center text-xs font-semibold text-slate-600 py-2">
-                                        {day}
-                                    </div>
-                                {/each}
-                            </div>
-
-                            <!-- Kalenderdager -->
-                            <div class="grid grid-cols-7 gap-1">
-                                {#each statsCalendarDays as day}
-                                    {#if day}
-                                        {@const isInSelectedPeriod = (() => {
-                                            if (statsPeriod === "week") {
-                                                const weekStart = startOfWeek(statsStartDate, { weekStartsOn: 1 });
-                                                const weekEnd = endOfWeek(statsStartDate, { weekStartsOn: 1 });
-                                                return isWithinInterval(day, { start: weekStart, end: weekEnd });
-                                            } else if (statsPeriod === "month") {
-                                                return isSameDay(startOfMonth(day), startOfMonth(statsStartDate));
-                                            } else {
-                                                // Fjernet ": Date" her for å unngå "Unexpected token"
-                                                const getSeasonStart = (d) => {
-                                                    const year = d.getFullYear();
-                                                    // Hvis vi er i jan-apr (0-3), startet sesongen 1. mai året før
-                                                    return d.getMonth() < 4 ? new Date(year - 1, 4, 1) : new Date(year, 4, 1);
-                                                };
-
-                                                const currentSeasonStart = getSeasonStart(statsStartDate);
-                                                const daySeasonStart = getSeasonStart(day);
-                                                
-                                                return isSameDay(currentSeasonStart, daySeasonStart);
-                                            }
-                                        })()}
-                                        {@const isToday = isSameDay(day, new Date())}
-                                        
-                                        <button
-                                            on:click={() => selectStatsDate(day)}
-                                            class={`
-                                                aspect-square p-2 rounded-lg text-sm transition-all
-                                                ${isInSelectedPeriod 
-                                                    ? 'bg-violet-500 text-white font-semibold shadow-sm' 
-                                                    : isToday
-                                                        ? 'bg-violet-100 text-violet-700 font-semibold'
-                                                        : 'hover:bg-slate-100 text-slate-700'
-                                                }
-                                            `}
-                                        >
-                                            {format(day, "d")}
-                                        </button>
-                                    {:else}
-                                        <div class="aspect-square"></div>
+                            <div>
+                                <p class="font-bold text-slate-800 text-sm leading-tight mb-1">{s.title}</p>
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    {#if s.durationMin}
+                                        <span class="flex items-center gap-1 font-bold text-sm text-slate-500">
+                                            <Clock class="h-4 w-4" /> {formatTime(s.durationMin)}
+                                        </span>
                                     {/if}
-                                {/each}
-                            </div>
-
-                            <!-- Hurtigvalg -->
-                            <div class="mt-6">
-                                <button
-                                    on:click={() => {
-                                        const now = new Date();
-                                        if (statsPeriod === "week") {
-                                            statsStartDate = startOfWeek(now, { weekStartsOn: 1 });
-                                        } else if (statsPeriod === "month") {
-                                            statsStartDate = startOfMonth(now);
-                                        } else {
-                                            statsStartDate = startOfYear(now);
-                                        }
-                                        closeStatsCalendar();
-                                    }}
-                                    class="w-full px-4 py-2 bg-violet-50 text-violet-500 rounded-lg font-medium hover:bg-violet-200 transition-colors"
-                                >
-                                    {statsPeriod === "week" ? "Nåværende uke" : statsPeriod === "month" ? "Nåværende måned" : "I år"}
-                                </button>
+                                </div>
                             </div>
                         </div>
                     </div>
-                {/if}
-            {/if}
-        </div>
+                {/each}
 
-        {#if view === VIEWS.CALENDAR}
-            <div class="mt-8 mb-12 mx-auto max-w-6xl px-4">
-                <div
-                    class="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 gap-3 sm:gap-0"
-                >
-                    <h3 class="text-2xl font-bold text-center sm:text-left">
-                        {format(calendarCursor, "LLLL yyyy", { locale: nb })}
-                    </h3>
-
-                    <div class="flex justify-center sm:justify-end gap-2">
-                        <button
-                            on:click={goToToday}
-                            class="border rounded-xl px-3 py-2 text-sm hover:bg-violet-50"
-                        >
-                            I dag
-                        </button>
-                        <button
-                            on:click={() => changeMonth("prev")}
-                            class="border rounded-xl p-2"
-                        >
-                            <ChevronLeft class="h-4 w-4" />
-                        </button>
-                        <button
-                            on:click={() => changeMonth("next")}
-                            class="border rounded-xl p-2"
-                        >
-                            <ChevronRight class="h-4 w-4" />
-                        </button>
+                {#if selectedSessionGroup.sessions[0]?.description}
+                    <div class="bg-slate-50 rounded-xl p-3.5 mt-1 mb-3">
+                        <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5">Kommentar</p>
+                        <p class="text-sm text-slate-700 leading-relaxed">{selectedSessionGroup.sessions[0].description}</p>
                     </div>
+                {/if}
+
+                {#if !selectedSessionGroup.sessions.some(s => s.title.toLowerCase().includes("hvile"))}
+                    {@const isDouble = selectedSessionGroup.sessions.length >= 2}
+                    {@const f1 = getFellesUtovere(selectedSessionGroup.date, selectedSessionGroup.sessions[0]?.title)}
+                    {@const f2 = isDouble ? getFellesUtovere(selectedSessionGroup.date, selectedSessionGroup.sessions[1]?.title) : []}
+                    {@const allF = Array.from(new Set([...f1, ...f2]))}
+
+                    <div class="mt-3">
+                        <p class="flex items-center gap-2 text-sm font-semibold text-[#19747E] mb-2">
+                            <Users class="h-4 w-4" />
+                            {allF.length > 0 ? `${allF.length} andre har samme økt` : "Ingen andre har samme økt"}
+                        </p>
+                        {#if isDouble}
+                            {#if f1.length > 0}
+                                <p class="text-xs font-semibold text-slate-500 mb-1.5">Økt 1:</p>
+                                <div class="flex flex-wrap gap-1.5 mb-3 pb-3 border-b border-slate-100">
+                                    {#each f1 as u}<span class="bg-[#D1E8E2]/50 text-[#19747E] rounded-full px-3 py-1 text-xs font-semibold border border-[#19747E]">{u}</span>{/each}
+                                </div>
+                            {:else}
+                                <p class="text-xs text-slate-400 italic mb-3 pb-3 border-b border-slate-100">Økt 1: Ingen andre</p>
+                            {/if}
+                            {#if f2.length > 0}
+                                <p class="text-xs font-semibold text-slate-500 mb-1.5">Økt 2:</p>
+                                <div class="flex flex-wrap gap-1.5">
+                                    {#each f2 as u}<span class="bg-[#D1E8E2]/50 text-[#19747E] rounded-full px-3 py-1 text-xs font-semibold border border-[#19747E]">{u}</span>{/each}
+                                </div>
+                            {:else}
+                                <p class="text-xs text-slate-400 italic">Økt 2: Ingen andre</p>
+                            {/if}
+                        {:else if f1.length > 0}
+                            <div class="flex flex-wrap gap-1.5">
+                                {#each f1 as u}<span class="bg-[#D1E8E2]/50 text-[#19747E] rounded-full px-3 py-1 text-xs font-semibold border border-[#19747E]">{u}</span>{/each}
+                            </div>
+                        {:else}
+                            <p class="text-xs text-slate-400 italic">Ingen andre er satt opp med denne økten.</p>
+                        {/if}
+                    </div>
+                {/if}
+            </div>
+        </div>
+    {/if}
+
+    <!-- CALENDAR MODAL -->
+    {#if activeModal === "calendar"}
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4"
+            on:click={() => activeModal = null} role="button" tabindex="0"
+            on:keydown={(e) => e.key === "Escape" && (activeModal = null)} aria-label="Lukk">
+            <div class="bg-white w-full max-w-sm rounded-3xl p-5 shadow-2xl relative"
+                on:click|stopPropagation role="dialog" aria-modal="true">
+
+                <!-- X close button – above month navigation -->
+                <div class="flex justify-end mb-2">
+                    <button on:click={() => activeModal = null}
+                        class="bg-slate-100 hover:bg-slate-200 rounded-lg p-1.5 text-slate-500 transition-colors">
+                        <X class="h-5 w-5" />
+                    </button>
                 </div>
 
-                <div
-                    class="grid grid-cols-7 gap-2 text-center text-sm text-slate-600"
-                >
-                    {#each ["man", "tir", "ons", "tor", "fre", "lør", "søn"] as d}
-                        <div>{d}</div>
+                <div class="flex items-center justify-between mb-4">
+                    <button on:click={() => { calendarModalCursor = subMonths(calendarModalCursor, 1); updateCalendarModalDays(); }}
+                        class="bg-slate-100 hover:bg-[#A9D6E5] rounded-xl p-2 transition-colors">
+                        <ChevronLeft class="h-4 w-4 text-[#19747E]" />
+                    </button>
+                    <h3 class="font-bold text-slate-800 capitalize">{format(calendarModalCursor, "MMMM yyyy", { locale: nb })}</h3>
+                    <button on:click={() => { calendarModalCursor = addMonths(calendarModalCursor, 1); updateCalendarModalDays(); }}
+                        class="bg-slate-100 hover:bg-[#A9D6E5] rounded-xl p-2 transition-colors">
+                        <ChevronRight class="h-4 w-4 text-[#19747E]" />
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-7 gap-1 mb-1">
+                    {#each ["Ma","Ti","On","To","Fr","Lø","Sø"] as d}
+                        <div class="text-center text-xs font-bold text-slate-400 py-1">{d}</div>
                     {/each}
                 </div>
-
-                <div class="mt-2 grid grid-cols-7 gap-2">
-                    {#each days as d}
+                <div class="grid grid-cols-7 gap-1">
+                    {#each calendarModalDays as d}
                         {#if d}
-                            <button
-                                class={`relative rounded-xl border p-2 pt-8 text-left bg-white hover:bg-violet-50 transition-colors ${
-                                    isSameDay(d, activeDate)
-                                        ? "border-violet-500"
-                                        : "border-slate-200"
-                                }`}
-                                on:click={() => selectDay(d)}
-                            >
-                                <div
-                                    class="absolute top-1 left-1 flex items-start justify-start"
-                                >
-                                    <div
-                                        class="hidden sm:flex w-7 h-7 rounded-full bg-violet-600 text-white text-xs font-semibold items-center justify-center shadow-sm"
-                                    >
-                                        {format(d, "d")}
+                            {@const isT = isSameDay(d, today)}
+                            {@const isSel = isSameDay(d, activeDate)}
+                            {@const dayW = workouts.filter(w => w.date === format(d, "yyyy-MM-dd"))}
+                            {@const hasW = dayW.length > 0}
+                            {@const isDbl = dayW.length >= 2}
+                            <button on:click={() => selectCalendarDate(d)}
+                                class="aspect-square rounded-lg text-sm flex flex-col items-center justify-center gap-0.5 transition-colors
+                                    {isSel ? 'bg-[#19747E] text-white font-bold' : isT ? 'bg-[#A9D6E5] text-[#19747E] font-bold' : 'hover:bg-slate-100 text-slate-700'}">
+                                {format(d, "d")}
+                                {#if hasW}
+                                    <div class="flex gap-0.5">
+                                        <span class="w-1 h-1 rounded-full {isSel ? 'bg-white/70' : 'bg-[#19747E]'}"></span>
+                                        {#if isDbl}<span class="w-1 h-1 rounded-full {isSel ? 'bg-white/50' : 'bg-[#19747E]'}"></span>{/if}
                                     </div>
-
-                                    <div
-                                        class="text-sm font-medium text-center sm:hidden"
-                                    >
-                                        {format(d, "d")}
-                                    </div>
-                                </div>
-
-                                {#await Promise.all(workouts
-                                        .filter((w) => w.date === format(d, "yyyy-MM-dd"))
-                                        .map( (w) => getWorkoutInfo(w.title), )) then infos}
-                                    {#if infos.length > 0}
-                                        <div
-                                            class="flex sm:hidden mt-1 flex-wrap gap-1"
-                                        >
-                                            {#each infos.slice(0, 3) as info, idx (idx)}
-                                                <div
-                                                    class="w-3 h-3 rounded-full shadow-sm"
-                                                    style={`background-color: ${
-                                                        info.color.includes(
-                                                            "bg-red-100",
-                                                        )
-                                                            ? "#ff0000"
-                                                            : info.color.includes(
-                                                                    "bg-yellow-100",
-                                                                )
-                                                              ? "#ffff00"
-                                                              : info.color.includes(
-                                                                      "bg-green-100",
-                                                                  )
-                                                                ? "#00ff00"
-                                                                : info.color.includes(
-                                                                        "bg-cyan-100",
-                                                                    )
-                                                                  ? "#00ffff"
-                                                                  : "#f9eeff"
-                                                    };`}
-                                                ></div>
-                                            {/each}
-                                            {#if infos.length > 3}
-                                                <div
-                                                    class="w-3 h-3 rounded-full bg-slate-400 shadow-sm"
-                                                ></div>
-                                            {/if}
-                                        </div>
-                                    {/if}
-                                {/await}
-
-                                <div class="hidden sm:block mt-1">
-                                    {#each workouts
-                                        .filter((w) => w.date === format(d, "yyyy-MM-dd"))
-                                        .slice(0, 2) as w}
-                                        {#await Promise.resolve(getWorkoutInfo(w.title)) then info}
-                                            <div
-                                                class={`text-xs ${info.color} px-2 py-0.5 rounded-lg mb-0.5 break-words whitespace-normal font-medium`}
-                                            >
-                                                {w.title}
-                                            </div>
-                                        {/await}
-                                    {/each}
-                                </div>
+                                {/if}
                             </button>
                         {:else}
                             <div></div>
                         {/if}
                     {/each}
                 </div>
+
+                <button on:click={() => selectCalendarDate(today)}
+                    class="w-full mt-4 py-2.5 rounded-xl border border-[#19747E] bg-[#D1E8E2] text-[#19747E] text-sm font-semibold transition-colors">
+                    Gå til i dag
+                </button>
             </div>
-        {/if}
-    </div>
+        </div>
+    {/if}
+
+    <!-- PROFILE PANEL -->
+    {#if activeModal === "profile"}
+        <div class="fixed inset-0 z-50 flex justify-end bg-slate-900/40 backdrop-blur-sm"
+            on:click={() => { activeModal = null; showStyrkeSubmenu = false; }}
+            role="button" tabindex="0"
+            on:keydown={(e) => e.key === "Escape" && (activeModal = null)} aria-label="Lukk">
+            <div class="bg-white h-full w-72 max-w-[85vw] shadow-2xl flex flex-col"
+                on:click|stopPropagation role="dialog" aria-modal="true">
+
+                <div class="bg-[#19747E] px-5 py-6 flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+                        <User class="h-4 w-4 text-white" />
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="font-bold text-white capitalize">{isAdmin ? (username.charAt(0).toUpperCase() + username.slice(1)) : username}</p>
+                        {#if isAdmin && currentUtoverNavn}
+                            <p class="text-xs text-white truncate">Viser: {currentUtoverNavn}</p>
+                        {/if}
+                    </div>
+                    <button on:click={() => { activeModal = null; showStyrkeSubmenu = false; }}
+                        class="bg-white/20 hover:bg-white/30 rounded-lg p-1.5 text-white transition-colors">
+                        <X class="h-5 w-5" />
+                    </button>
+                </div>
+
+                <div class="flex-1 overflow-y-auto p-3">
+                    {#if !showStyrkeSubmenu}
+                        {#if currentEditPlanSheet}
+                            <a href={currentEditPlanSheet} target="_blank" rel="noopener noreferrer"
+                                on:click={() => activeModal = null}
+                                class="flex items-center gap-3 w-full px-3 py-3 rounded-xl hover:bg-slate-50 transition-colors text-left mb-1">
+                                <span class="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center flex-shrink-0">
+                                    <ExternalLink class="h-6 w-6 text-green-700" />
+                                </span>
+                                <span class="text-sm font-medium text-slate-700 truncate">
+                                    {isAdmin && currentUtoverNavn ? `${currentUtoverNavn} – Google Sheet` : "Min treningsplan"}
+                                </span>
+                            </a>
+                        {/if}
+
+                        <button on:click={() => showStyrkeSubmenu = true}
+                            class="flex items-center gap-3 w-full px-3 py-3 rounded-xl hover:bg-slate-50 transition-colors text-left mb-1">
+                            <span class="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
+                                <Dumbbell class="h-6 w-6 text-[#19747E]" />
+                            </span>
+                            <span class="text-sm font-medium text-slate-700 flex-1">Styrkeøkter</span>
+                            <ChevronRight class="h-6 w-6 text-slate-300" />
+                        </button>
+
+                        <a href="/pdf/Intensitessoner.pdf" target="_blank" rel="noopener noreferrer"
+                            on:click={() => activeModal = null}
+                            class="flex items-center gap-3 w-full px-3 py-3 rounded-xl hover:bg-slate-50 transition-colors text-left mb-1">
+                            <span class="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
+                                <FileText class="h-6 w-6 text-[#19747E]" />
+                            </span>
+                            <span class="text-sm font-medium text-slate-700">Intensitetssoner</span>
+                        </a>
+
+                        <div class="h-px bg-slate-100 my-2"></div>
+
+                        <button on:click={handleLogout}
+                            class="flex items-center gap-3 w-full px-3 py-3 rounded-xl hover:bg-red-50 transition-colors text-left">
+                            <span class="w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center flex-shrink-0">
+                                <LogOut class="h-6 w-6 text-red-600" />
+                            </span>
+                            <span class="text-sm font-medium text-red-600">Logg ut</span>
+                        </button>
+                    {:else}
+                        <button on:click={() => showStyrkeSubmenu = false}
+                            class="flex items-center gap-2 text-sm font-semibold text-[#19747E] px-3 py-2 mb-2 hover:bg-[#A9D6E5]/50 rounded-lg transition-colors">
+                            <ArrowLeft class="h-6 w-6" /> Tilbake
+                        </button>
+                        <p class="text-xs font-bold text-slate-400 uppercase tracking-widest px-3 mb-2">Styrkeøkter</p>
+                        {#each styrkeProgrammer as p}
+                            <a href={p.url} target="_blank" rel="noopener noreferrer"
+                                on:click={() => activeModal = null}
+                                class="flex items-center gap-3 w-full px-3 py-3 rounded-xl hover:bg-slate-50 transition-colors text-left mb-1">
+                                <span class="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
+                                    <FileText class="h-6 w-6 text-[#19747E]" />
+                                </span>
+                                <span class="text-sm font-medium text-slate-700">{p.title}</span>
+                            </a>
+                        {/each}
+                    {/if}
+                </div>
+            </div>
+        </div>
+    {/if}
+
+</div>
+{/if}
+
+{#if isLoading && loggedIn}
+    <div class="fixed top-0 inset-x-0 h-0.5 z-[999] bg-gradient-to-r from-[#19747E] via-[#19747E]/20 to-[#19747E] animate-pulse"></div>
 {/if}
