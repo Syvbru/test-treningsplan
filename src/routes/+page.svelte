@@ -1053,7 +1053,7 @@
         <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40 backdrop-blur-sm"
             on:click={() => activeModal = null} role="button" tabindex="0"
             on:keydown={(e) => e.key === "Escape" && (activeModal = null)} aria-label="Lukk">
-            <div class="bg-white w-full max-w-lg sm:rounded-3xl rounded-t-3xl max-h-[88vh] overflow-y-auto p-5 pb-8 relative sm:mx-4"
+            <div class="bg-white w-full max-w-lg sm:rounded-3xl rounded-t-3xl max-h-[88vh] min-h-[50vh] sm:min-h-0 overflow-y-auto p-5 pb-8 relative sm:mx-4"
                 on:click|stopPropagation role="dialog" aria-modal="true">
 
                 <button on:click={() => activeModal = null}
@@ -1235,7 +1235,7 @@
                                     <ExternalLink class="h-6 w-6 text-green-700" />
                                 </span>
                                 <span class="text-sm font-medium text-slate-700 truncate">
-                                    {isAdmin && currentUtoverNavn ? `${currentUtoverNavn} – Google Sheet` : "Min treningsplan"}
+                                    {isAdmin && currentUtoverNavn ? `${currentUtoverNavn} – Google Sheet` : "Min treningsplan (Rediger)"}
                                 </span>
                             </a>
                         {/if}
