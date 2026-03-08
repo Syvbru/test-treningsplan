@@ -223,6 +223,7 @@
                         }
                     });
                     fellesOkter = parsed;
+                    setTimeout(() => { fellesOkter = [...fellesOkter]; }, 2000);
                 }
             });
         } catch (e) { console.error("Felles økt feil:", e); }
