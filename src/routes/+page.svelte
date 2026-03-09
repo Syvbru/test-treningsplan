@@ -268,7 +268,7 @@
         const lower = title.toLowerCase();
         if (lower.includes("intervall"))
             return { icon: Timer, color: "text-red-600", bg: "bg-red-100", hex: "#B91C1C", hexBg: "#FEF2F2" };
-        const isHard = lower.includes("motbakkeløp") || lower.includes("sprint") || lower.includes("sprintøkt") || lower.includes("distanseøkt") || /(rennet|(?<!lang)renn(?!forbered))/u.test(lower) || lower.includes("dsv-cup") || lower.includes("km ") || lower.includes(" km") || lower.includes("birken") || lower.includes("klubbmesterskap") || lower.includes("skifestival");
+        const isHard = lower.includes("motbakkeløp") || lower.includes("sprint") || lower.includes("sprintøkt") || lower.includes("distanseøkt") || /(rennet|(?<!lang)renn(?!forbered))/u.test(lower) || lower.includes("dsv-cup") || lower.includes("km ") || lower.includes(" km") || lower.includes("birken") || lower.includes("klubbmesterskap") || lower.includes("skifestival") || lower.includes("vestmarka opp") || lower.includes("gjelleråsbakken") || lower.includes("askerspurten") || lower.includes("oslo marat") || lower.includes("terrengløp")|| lower.includes("10 for grete") || lower.includes("kong harald");
         if (isHard)
             return { icon: Timer, color: "text-red-600", bg: "bg-red-100", hex: "#B91C1C", hexBg: "#FEF2F2" };
         if (lower.includes("hvile"))
@@ -279,7 +279,7 @@
             return { icon: Zap, color: "text-[#A9D6E5]", bg: "bg-[#EBFAFF]/60", hex: "#0369A1", hexBg: "#F0F9FF" };
         if (lower.includes("teknikk"))
             return { icon: BookOpen, color: "text-[#A9D6E5]", bg: "bg-[#EBFAFF]/60", hex: "#0369A1", hexBg: "#F0F9FF" };
-        if (lower.includes("styrke"))
+        if (lower.includes("styrke") || lower.includes("basis"))
             return { icon: Dumbbell, color: "text-yellow-600", bg: "bg-yellow-100", hex: "#A16207", hexBg: "#FEFCE8" };
         if (lower.includes("rennforberedende"))
             return { icon: Heart, color: "text-[#A9D6E5]", bg: "bg-[#EBFAFF]/60", hex: "#0369A1", hexBg: "#F0F9FF" };
@@ -287,17 +287,31 @@
     }
 
     // Extract movement-form title from a workout name for the card heading
-    const MOVEMENT_FORMS = ["klassisk", "skate", "skøyting", "staking", "styrke", "løp", "løping", "jogg", "hvile", "sykkel", "skierg", "spinning", "mølle", "roing"];
+    const MOVEMENT_FORMS = ["klassisk", "skate", "skøyting", "staking", "styrke", "løp", "løping", "jogg", "jogging", "hvile", "sykkel", "skierg", "spinning", "mølle", "roing", "spenst", "mobilitet", "balanse", "stabilitet", "hyrox", "langkjøring", "elghufs", "skigang", "terrengsykkel", "landevei", "racer", "romaskin", "kajakk", "svømming", "tredemølle", "fotball", "volleyball", "innebandy", "basket", "tøying", "beveglighet", "koordinasjon", "hvile", "dans", "basis", "samling", "orientering", "friidrett", "skøyter"];
     function getCardTitle(title: string): string {
         const lower = title.toLowerCase();
         // Intervall overrides everything
         if (lower.includes("intervall")) return "Intervall";
         // Hurtighet and Styrke override movement form
-        if (lower.includes("hurtighet")) return "Hurtighet";
+        if (lower.includes("langtur")) return "Langtur";
         if (lower.includes("styrke")) return "Styrke";
+        if (lower.includes("teknikk")) return "Teknikk";
+        if (lower.includes("hurtighet")) return "Hurtighet";
+        if (lower.includes("skiskole")) return "Skiskole";
+        if (lower.includes("valgfri")) return "Valgfri";
+        if (lower.includes("skiskyting")) return "Skiskyting";
+        if (lower.includes("mat og helse")) return "M & H";
+        if (lower.includes("overnatting")) return "Skoletur";
+        if (lower.includes("idrettspesi") || lower.includes("idrettsspesi")) return "NTG langrenn";
+        if (lower.includes("ntg") || lower.includes("idrettsspesi")) return "NTG-økt";
+        if (lower.includes("tg1") || lower.includes("tg2") || lower.includes("tg3") || lower.includes("tg4") || lower.includes("tg5")) return "Teknikk";
         // Renn-logic
-        const isRenn = lower.includes("motbakkeløp") || lower.includes("sprint") || lower.includes("sprintøkt") || lower.includes("distanseøkt") || /(rennet|(?<!lang)renn(?!forbered))/u.test(lower) || lower.includes("dsv-cup") || lower.includes("km ") || lower.includes(" km") || lower.includes("birken") || lower.includes("klubbmesterskap") || lower.includes("skifestival");
+        const isTest = lower.includes("motbakkeløp") || lower.includes("sprintøkt") || lower.includes("distanseøkt");
+        if (isTest) return "Test";
+        const isRenn =  lower.includes("sprint") || /(rennet|(?<!lang)renn(?!forbered))/u.test(lower) || lower.includes("dsv-cup") || lower.includes("km ") || lower.includes(" km") || lower.includes("birken") || lower.includes("klubbmesterskap") || lower.includes("skifestival") || lower.includes("vestmarka opp") || lower.includes("gjelleråsbakken") || lower.includes("kong harald");
         if (isRenn) return "Renn";
+        const isHardokt = lower.includes("oslo marat") || lower.includes("terrengløp") || lower.includes("10 for grete") || lower.includes("askerspurten");
+        if (isHardokt) return "Hardøkt";
         for (const form of MOVEMENT_FORMS) {
             if (lower.includes(form)) {
                 return form.charAt(0).toUpperCase() + form.slice(1);
@@ -374,10 +388,10 @@
         sw.forEach(w => {
             const lower = w.title.toLowerCase();
             if (lower.includes("hvile")) hvile++;
-            else if (lower.includes("styrke")) styrke++;
+            else if (lower.includes("styrke") || lower.includes("basis")) styrke++;
             else if (lower.includes("langtur")) langtur++;
             else {
-                const isH = lower.includes("intervall") || lower.includes("motbakkeløp") || lower.includes("sprint") || lower.includes("distanseøkt") || /(rennet|(?<!lang)renn(?!forbered))/u.test(lower) || lower.includes("dsv-cup") || lower.includes("km ") || lower.includes(" km") || lower.includes("birken") || lower.includes("klubbmesterskap") || lower.includes("skifestival");
+                const isH = lower.includes("intervall") || lower.includes("motbakkeløp") || lower.includes("sprint") || lower.includes("distanseøkt") || /(rennet|(?<!lang)renn(?!forbered))/u.test(lower) || lower.includes("dsv-cup") || lower.includes("km ") || lower.includes(" km") || lower.includes("birken") || lower.includes("klubbmesterskap") || lower.includes("skifestival") || lower.includes("vestmarka opp") || lower.includes("gjelleråsbakken") || lower.includes("askerspurten") || lower.includes("oslo marat") || lower.includes("terrengløp") || lower.includes("10 for grete") || lower.includes("kong harald");
                 if (isH) hard++;
             }
         });
