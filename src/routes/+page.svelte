@@ -267,23 +267,23 @@
     function getWorkoutInfo(title: string) {
         const lower = title.toLowerCase();
         if (lower.includes("intervall"))
-            return { icon: Timer, color: "text-red-700", bg: "bg-red-50", hex: "#B91C1C", hexBg: "#FEF2F2" };
+            return { icon: Timer, color: "text-red-600", bg: "bg-red-100", hex: "#B91C1C", hexBg: "#FEF2F2" };
         const isHard = lower.includes("motbakkeløp") || lower.includes("sprint") || lower.includes("sprintøkt") || lower.includes("distanseøkt") || /(rennet|(?<!lang)renn(?!forbered))/u.test(lower) || lower.includes("dsv-cup") || lower.includes("km ") || lower.includes(" km") || lower.includes("birken") || lower.includes("klubbmesterskap") || lower.includes("skifestival");
         if (isHard)
-            return { icon: Timer, color: "text-red-700", bg: "bg-red-50", hex: "#B91C1C", hexBg: "#FEF2F2" };
+            return { icon: Timer, color: "text-red-600", bg: "bg-red-100", hex: "#B91C1C", hexBg: "#FEF2F2" };
         if (lower.includes("hvile"))
-            return { icon: BatteryCharging, color: "text-green-700", bg: "bg-green-50", hex: "#15803D", hexBg: "#F0FDF4" };
+            return { icon: BatteryCharging, color: "text-green-600", bg: "bg-green-100", hex: "#15803D", hexBg: "#F0FDF4" };
         if (lower.includes("langtur"))
-            return { icon: Heart, color: "text-[#19747E]", bg: "bg-[#A9D6E5]/50", hex: "#0F766E", hexBg: "#F0FDFA" };
+            return { icon: Heart, color: "text-[#08BFB0]", bg: "bg-[#c2fffa]/70", hex: "#0F766E", hexBg: "#F0FDFA" };
         if (lower.includes("hurtighet"))
-            return { icon: Zap, color: "text-[#A9D6E5]", bg: "bg-[#A9D6E5]/20", hex: "#0369A1", hexBg: "#F0F9FF" };
+            return { icon: Zap, color: "text-[#A9D6E5]", bg: "bg-[#EBFAFF]/60", hex: "#0369A1", hexBg: "#F0F9FF" };
         if (lower.includes("teknikk"))
-            return { icon: BookOpen, color: "text-[#A9D6E5]", bg: "bg-[#A9D6E5]/20", hex: "#0369A1", hexBg: "#F0F9FF" };
+            return { icon: BookOpen, color: "text-[#A9D6E5]", bg: "bg-[#EBFAFF]/60", hex: "#0369A1", hexBg: "#F0F9FF" };
         if (lower.includes("styrke"))
-            return { icon: Dumbbell, color: "text-yellow-700", bg: "bg-yellow-50", hex: "#A16207", hexBg: "#FEFCE8" };
+            return { icon: Dumbbell, color: "text-yellow-600", bg: "bg-yellow-100", hex: "#A16207", hexBg: "#FEFCE8" };
         if (lower.includes("rennforberedende"))
-            return { icon: Heart, color: "text-[#A9D6E5]", bg: "bg-[#A9D6E5]/20", hex: "#0369A1", hexBg: "#F0F9FF" };
-        return { icon: Heart, color: "text-[#A9D6E5]", bg: "bg-[#A9D6E5]/20", hex: "#0369A1", hexBg: "#F0F9FF" };
+            return { icon: Heart, color: "text-[#A9D6E5]", bg: "bg-[#EBFAFF]/60", hex: "#0369A1", hexBg: "#F0F9FF" };
+        return { icon: Heart, color: "text-[#A9D6E5]", bg: "bg-[#EBFAFF]/60", hex: "#0369A1", hexBg: "#F0F9FF" };
     }
 
     // Extract movement-form title from a workout name for the card heading
@@ -385,10 +385,10 @@
         const totalSessions = sw.length - hvile;
         return {
             items: [
-                { label: "Hardøkter", value: hard, barColor: "#B91C1C" },
-                { label: "Styrke", value: styrke, barColor: "#A16207" },
-                { label: "Langturer", value: langtur, barColor: "#0F766E" },
-                { label: "Hvile", value: hvile, barColor: "#15803D" },
+                { label: "Hardøkter", value: hard, barColor: "#FA1616" },
+                { label: "Styrke", value: styrke, barColor: "#FABE19" },
+                { label: "Langturer", value: langtur, barColor: "#1EBDB0" },
+                { label: "Hvile", value: hvile, barColor: "#0BB02E" },
             ],
             total: totalSessions,
             totalHours: Math.floor(totalMins / 60),
@@ -564,6 +564,13 @@
         { title: "Kort styrkeøkt overkropp", url: "/pdf/KortStyrkeøktOverkropp.pdf" },
         { title: "Kort styrkeøkt ben", url: "/pdf/KortStyrkeøktBen.pdf" },
     ];
+
+    // ── YOUTUBE FACADE ───────────────────────────────────────────────────────────
+    let activeVideos = new Set<string>();
+    function activateVideo(id: string) {
+        activeVideos = new Set([...activeVideos, id]);
+    }
+    // ── SLUTT: YOUTUBE FACADE ────────────────────────────────────────────────────
 </script>
 
 {#if !loggedIn}
@@ -685,9 +692,9 @@
                     <input type="text" bind:value={currentUtoverNavn}
                         on:keydown={(e) => { if (e.key === "Enter") searchUtoverByName(); }}
                         placeholder="Søk etter utøver…"
-                        class="flex-1 rounded-full bg-[#A9D6E5]/50 border-0 px-4 py-2 text-[#19747E] placeholder-[#19747E] text-sm focus:ring-2 focus:ring-[#19747E] outline-none transition" />
+                        class="flex-1 rounded-full bg-[#dcf1f7]/80 border-0 px-4 py-2 text-[#19747E] placeholder-[#19747E] text-sm focus:ring-2 focus:ring-[#19747E] outline-none transition" />
                     <button on:click={searchUtoverByName} disabled={isLoading || !currentUtoverNavn.trim()}
-                        class="bg-[#A9D6E5]/50 hover:bg-[#A9D6E5] text-[#19747E] rounded-full px-4 py-2 text-sm font-semibold transition disabled:opacity-50">
+                        class="bg-[#dcf1f7]/80 hover:bg-[#A9D6E5] text-[#19747E] rounded-full px-4 py-2 text-sm font-semibold transition disabled:opacity-50">
                         {isLoading ? "…" : "Søk"}
                     </button>
                 </div>
@@ -852,7 +859,7 @@
 
             <!-- Stat Calendar Picker -->
             {#if showStatCalendar}
-                <div class="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm"
+                <div class="fixed inset-0 z-40 flex items-center justify-center pt-24 bg-slate-900/40 backdrop-blur-sm"
                     on:click={() => showStatCalendar = false}
                     role="button" tabindex="0"
                     on:keydown={(e) => e.key === "Escape" && (showStatCalendar = false)} aria-label="Lukk">
@@ -994,8 +1001,36 @@
                 <div class="bg-white rounded-2xl border border-slate-200 p-4">
                     <p class="text-md font-bold text-[#19747E] mb-3">Klassisk: <span class="text-[#A9D6E5] italic"> Diagonal </span> </p>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        <div class="rounded-xl overflow-hidden shadow-sm"><div class="aspect-video"><iframe class="w-full h-full" src="https://www.youtube.com/embed/Z2oNfG4eulQ?si=K3hgPIcHR19j3CUx" title="Diagonal" frameborder="0" allowfullscreen></iframe></div></div>
-                        <div class="rounded-xl overflow-hidden shadow-sm"><div class="aspect-video"><iframe class="w-full h-full" src="https://www.youtube.com/embed/NNR6YpFA7Jw?si=i19W-qDQ-Rv-4TDG" title="Diagonal 2" frameborder="0" allowfullscreen></iframe></div></div>
+                        <div class="rounded-xl overflow-hidden shadow-sm">
+                            <div class="aspect-video relative cursor-pointer group" on:click={() => activateVideo("Z2oNfG4eulQ")}>
+                                {#if activeVideos.has("Z2oNfG4eulQ")}
+                                    <iframe class="w-full h-full" src="https://www.youtube.com/embed/Z2oNfG4eulQ?autoplay=1" title="Diagonal" frameborder="0" allowfullscreen allow="autoplay"></iframe>
+                                {:else}
+                                    <img class="w-full h-full object-cover" src="https://img.youtube.com/vi/Z2oNfG4eulQ/hqdefault.jpg" alt="Diagonal" loading="lazy" />
+                                    <div class="absolute inset-0 flex items-center justify-center">
+                                        <svg viewBox="0 0 68 48" class="w-16 h-11 drop-shadow-lg group-hover:scale-110 transition-transform" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <rect width="68" height="48" rx="12" fill="#FF0000"/>
+                                            <polygon points="26,14 26,34 46,24" fill="white"/>
+                                        </svg>
+                                    </div>
+                                {/if}
+                            </div>
+                        </div>
+                        <div class="rounded-xl overflow-hidden shadow-sm">
+                            <div class="aspect-video relative cursor-pointer group" on:click={() => activateVideo("NNR6YpFA7Jw")}>
+                                {#if activeVideos.has("NNR6YpFA7Jw")}
+                                    <iframe class="w-full h-full" src="https://www.youtube.com/embed/NNR6YpFA7Jw?autoplay=1" title="Diagonal 2" frameborder="0" allowfullscreen allow="autoplay"></iframe>
+                                {:else}
+                                    <img class="w-full h-full object-cover" src="https://img.youtube.com/vi/NNR6YpFA7Jw/hqdefault.jpg" alt="Diagonal 2" loading="lazy" />
+                                    <div class="absolute inset-0 flex items-center justify-center">
+                                        <svg viewBox="0 0 68 48" class="w-16 h-11 drop-shadow-lg group-hover:scale-110 transition-transform" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <rect width="68" height="48" rx="12" fill="#FF0000"/>
+                                            <polygon points="26,14 26,34 46,24" fill="white"/>
+                                        </svg>
+                                    </div>
+                                {/if}
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -1003,8 +1038,36 @@
                 <div class="bg-white rounded-2xl border border-slate-200 p-4">
                     <p class="text-md font-bold text-[#19747E] mb-3">Klassisk: <span class="text-[#A9D6E5] italic"> Staking </span></p>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        <div class="rounded-xl overflow-hidden shadow-sm"><div class="aspect-video"><iframe class="w-full h-full" src="https://www.youtube.com/embed/D_hlp-buPhA?si=dDlDK1h5lWddEDzN" title="Staking" frameborder="0" allowfullscreen></iframe></div></div>
-                        <div class="rounded-xl overflow-hidden shadow-sm"><div class="aspect-video"><iframe class="w-full h-full" src="https://www.youtube.com/embed/MYVK4agNPcE?si=5L52ljY36n9Z1MZH" title="Staking 2" frameborder="0" allowfullscreen></iframe></div></div>
+                        <div class="rounded-xl overflow-hidden shadow-sm">
+                            <div class="aspect-video relative cursor-pointer group" on:click={() => activateVideo("D_hlp-buPhA")}>
+                                {#if activeVideos.has("D_hlp-buPhA")}
+                                    <iframe class="w-full h-full" src="https://www.youtube.com/embed/D_hlp-buPhA?autoplay=1" title="Staking" frameborder="0" allowfullscreen allow="autoplay"></iframe>
+                                {:else}
+                                    <img class="w-full h-full object-cover" src="https://img.youtube.com/vi/D_hlp-buPhA/hqdefault.jpg" alt="Staking" loading="lazy" />
+                                    <div class="absolute inset-0 flex items-center justify-center">
+                                        <svg viewBox="0 0 68 48" class="w-16 h-11 drop-shadow-lg group-hover:scale-110 transition-transform" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <rect width="68" height="48" rx="12" fill="#FF0000"/>
+                                            <polygon points="26,14 26,34 46,24" fill="white"/>
+                                        </svg>
+                                    </div>
+                                {/if}
+                            </div>
+                        </div>
+                        <div class="rounded-xl overflow-hidden shadow-sm">
+                            <div class="aspect-video relative cursor-pointer group" on:click={() => activateVideo("MYVK4agNPcE")}>
+                                {#if activeVideos.has("MYVK4agNPcE")}
+                                    <iframe class="w-full h-full" src="https://www.youtube.com/embed/MYVK4agNPcE?autoplay=1" title="Staking 2" frameborder="0" allowfullscreen allow="autoplay"></iframe>
+                                {:else}
+                                    <img class="w-full h-full object-cover" src="https://img.youtube.com/vi/MYVK4agNPcE/hqdefault.jpg" alt="Staking 2" loading="lazy" />
+                                    <div class="absolute inset-0 flex items-center justify-center">
+                                        <svg viewBox="0 0 68 48" class="w-16 h-11 drop-shadow-lg group-hover:scale-110 transition-transform" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <rect width="68" height="48" rx="12" fill="#FF0000"/>
+                                            <polygon points="26,14 26,34 46,24" fill="white"/>
+                                        </svg>
+                                    </div>
+                                {/if}
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -1012,7 +1075,21 @@
                 <div class="bg-white rounded-2xl border border-slate-200 p-4">
                     <p class="text-md font-bold text-[#19747E] mb-3">Klassisk: <span class="text-[#A9D6E5] italic"> Dobbeltak med fraspark </span></p>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        <div class="rounded-xl overflow-hidden shadow-sm"><div class="aspect-video"><iframe class="w-full h-full" src="https://www.youtube.com/embed/7SZn1vDG_WY?si=obHl2RpMR8ByMgfz" title="Dobbeltak" frameborder="0" allowfullscreen></iframe></div></div>
+                        <div class="rounded-xl overflow-hidden shadow-sm">
+                            <div class="aspect-video relative cursor-pointer group" on:click={() => activateVideo("7SZn1vDG_WY")}>
+                                {#if activeVideos.has("7SZn1vDG_WY")}
+                                    <iframe class="w-full h-full" src="https://www.youtube.com/embed/7SZn1vDG_WY?autoplay=1" title="Dobbeltak" frameborder="0" allowfullscreen allow="autoplay"></iframe>
+                                {:else}
+                                    <img class="w-full h-full object-cover" src="https://img.youtube.com/vi/7SZn1vDG_WY/hqdefault.jpg" alt="Dobbeltak med fraspark" loading="lazy" />
+                                    <div class="absolute inset-0 flex items-center justify-center">
+                                        <svg viewBox="0 0 68 48" class="w-16 h-11 drop-shadow-lg group-hover:scale-110 transition-transform" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <rect width="68" height="48" rx="12" fill="#FF0000"/>
+                                            <polygon points="26,14 26,34 46,24" fill="white"/>
+                                        </svg>
+                                    </div>
+                                {/if}
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -1020,8 +1097,36 @@
                 <div class="bg-white rounded-2xl border border-slate-200 p-4">
                     <p class="text-md font-bold text-[#19747E] mb-3">Skøyting: <span class="text-[#A9D6E5] italic"> Dobbeldans </span></p>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        <div class="rounded-xl overflow-hidden shadow-sm"><div class="aspect-video"><iframe class="w-full h-full" src="https://www.youtube.com/embed/PlFkOEr7bw0?si=qVwizVGKQVB6ixoA" title="Dobbeldans" frameborder="0" allowfullscreen></iframe></div></div>
-                        <div class="rounded-xl overflow-hidden shadow-sm"><div class="aspect-video"><iframe class="w-full h-full" src="https://www.youtube.com/embed/G-vIb6gzYRk?si=I7mpCV1p-j7vSKv_" title="Dobbeldans 2" frameborder="0" allowfullscreen></iframe></div></div>
+                        <div class="rounded-xl overflow-hidden shadow-sm">
+                            <div class="aspect-video relative cursor-pointer group" on:click={() => activateVideo("PlFkOEr7bw0")}>
+                                {#if activeVideos.has("PlFkOEr7bw0")}
+                                    <iframe class="w-full h-full" src="https://www.youtube.com/embed/PlFkOEr7bw0?autoplay=1" title="Dobbeldans" frameborder="0" allowfullscreen allow="autoplay"></iframe>
+                                {:else}
+                                    <img class="w-full h-full object-cover" src="https://img.youtube.com/vi/PlFkOEr7bw0/hqdefault.jpg" alt="Dobbeldans" loading="lazy" />
+                                    <div class="absolute inset-0 flex items-center justify-center">
+                                        <svg viewBox="0 0 68 48" class="w-16 h-11 drop-shadow-lg group-hover:scale-110 transition-transform" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <rect width="68" height="48" rx="12" fill="#FF0000"/>
+                                            <polygon points="26,14 26,34 46,24" fill="white"/>
+                                        </svg>
+                                    </div>
+                                {/if}
+                            </div>
+                        </div>
+                        <div class="rounded-xl overflow-hidden shadow-sm">
+                            <div class="aspect-video relative cursor-pointer group" on:click={() => activateVideo("G-vIb6gzYRk")}>
+                                {#if activeVideos.has("G-vIb6gzYRk")}
+                                    <iframe class="w-full h-full" src="https://www.youtube.com/embed/G-vIb6gzYRk?autoplay=1" title="Dobbeldans 2" frameborder="0" allowfullscreen allow="autoplay"></iframe>
+                                {:else}
+                                    <img class="w-full h-full object-cover" src="https://img.youtube.com/vi/G-vIb6gzYRk/hqdefault.jpg" alt="Dobbeldans 2" loading="lazy" />
+                                    <div class="absolute inset-0 flex items-center justify-center">
+                                        <svg viewBox="0 0 68 48" class="w-16 h-11 drop-shadow-lg group-hover:scale-110 transition-transform" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <rect width="68" height="48" rx="12" fill="#FF0000"/>
+                                            <polygon points="26,14 26,34 46,24" fill="white"/>
+                                        </svg>
+                                    </div>
+                                {/if}
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -1029,8 +1134,36 @@
                 <div class="bg-white rounded-2xl border border-slate-200 p-4">
                     <p class="text-md font-bold text-[#19747E] mb-3">Skøyting: <span class="text-[#A9D6E5] italic"> Padling </span></p>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        <div class="rounded-xl overflow-hidden shadow-sm"><div class="aspect-video"><iframe class="w-full h-full" src="https://www.youtube.com/embed/Z6ynMU7KixA?si=Av9HKthu8O9wEXGm" title="Padling" frameborder="0" allowfullscreen></iframe></div></div>
-                        <div class="rounded-xl overflow-hidden shadow-sm"><div class="aspect-video"><iframe class="w-full h-full" src="https://www.youtube.com/embed/-eWpFQ9rDos?si=7QZpyucS4EGulPl7" title="Padling 2" frameborder="0" allowfullscreen></iframe></div></div>
+                        <div class="rounded-xl overflow-hidden shadow-sm">
+                            <div class="aspect-video relative cursor-pointer group" on:click={() => activateVideo("Z6ynMU7KixA")}>
+                                {#if activeVideos.has("Z6ynMU7KixA")}
+                                    <iframe class="w-full h-full" src="https://www.youtube.com/embed/Z6ynMU7KixA?autoplay=1" title="Padling" frameborder="0" allowfullscreen allow="autoplay"></iframe>
+                                {:else}
+                                    <img class="w-full h-full object-cover" src="https://img.youtube.com/vi/Z6ynMU7KixA/hqdefault.jpg" alt="Padling" loading="lazy" />
+                                    <div class="absolute inset-0 flex items-center justify-center">
+                                        <svg viewBox="0 0 68 48" class="w-16 h-11 drop-shadow-lg group-hover:scale-110 transition-transform" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <rect width="68" height="48" rx="12" fill="#FF0000"/>
+                                            <polygon points="26,14 26,34 46,24" fill="white"/>
+                                        </svg>
+                                    </div>
+                                {/if}
+                            </div>
+                        </div>
+                        <div class="rounded-xl overflow-hidden shadow-sm">
+                            <div class="aspect-video relative cursor-pointer group" on:click={() => activateVideo("-eWpFQ9rDos")}>
+                                {#if activeVideos.has("-eWpFQ9rDos")}
+                                    <iframe class="w-full h-full" src="https://www.youtube.com/embed/-eWpFQ9rDos?autoplay=1" title="Padling 2" frameborder="0" allowfullscreen allow="autoplay"></iframe>
+                                {:else}
+                                    <img class="w-full h-full object-cover" src="https://img.youtube.com/vi/-eWpFQ9rDos/hqdefault.jpg" alt="Padling 2" loading="lazy" />
+                                    <div class="absolute inset-0 flex items-center justify-center">
+                                        <svg viewBox="0 0 68 48" class="w-16 h-11 drop-shadow-lg group-hover:scale-110 transition-transform" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <rect width="68" height="48" rx="12" fill="#FF0000"/>
+                                            <polygon points="26,14 26,34 46,24" fill="white"/>
+                                        </svg>
+                                    </div>
+                                {/if}
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -1038,8 +1171,36 @@
                 <div class="bg-white rounded-2xl border border-slate-200 p-4">
                     <p class="text-md font-bold text-[#19747E] mb-3">Skøyting: <span class="text-[#A9D6E5] italic"> Enkeldans </span></p>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        <div class="rounded-xl overflow-hidden shadow-sm"><div class="aspect-video"><iframe class="w-full h-full" src="https://www.youtube.com/embed/8PLC-KWs4c0?si=pk7x-OE3AfzP6xfh" title="Enkeldans" frameborder="0" allowfullscreen></iframe></div></div>
-                        <div class="rounded-xl overflow-hidden shadow-sm"><div class="aspect-video"><iframe class="w-full h-full" src="https://www.youtube.com/embed/QWZp2WVukkY?si=LTEtEeruo-R8zkWa" title="Enkeldans 2" frameborder="0" allowfullscreen></iframe></div></div>
+                        <div class="rounded-xl overflow-hidden shadow-sm">
+                            <div class="aspect-video relative cursor-pointer group" on:click={() => activateVideo("8PLC-KWs4c0")}>
+                                {#if activeVideos.has("8PLC-KWs4c0")}
+                                    <iframe class="w-full h-full" src="https://www.youtube.com/embed/8PLC-KWs4c0?autoplay=1" title="Enkeldans" frameborder="0" allowfullscreen allow="autoplay"></iframe>
+                                {:else}
+                                    <img class="w-full h-full object-cover" src="https://img.youtube.com/vi/8PLC-KWs4c0/hqdefault.jpg" alt="Enkeldans" loading="lazy" />
+                                    <div class="absolute inset-0 flex items-center justify-center">
+                                        <svg viewBox="0 0 68 48" class="w-16 h-11 drop-shadow-lg group-hover:scale-110 transition-transform" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <rect width="68" height="48" rx="12" fill="#FF0000"/>
+                                            <polygon points="26,14 26,34 46,24" fill="white"/>
+                                        </svg>
+                                    </div>
+                                {/if}
+                            </div>
+                        </div>
+                        <div class="rounded-xl overflow-hidden shadow-sm">
+                            <div class="aspect-video relative cursor-pointer group" on:click={() => activateVideo("QWZp2WVukkY")}>
+                                {#if activeVideos.has("QWZp2WVukkY")}
+                                    <iframe class="w-full h-full" src="https://www.youtube.com/embed/QWZp2WVukkY?autoplay=1" title="Enkeldans 2" frameborder="0" allowfullscreen allow="autoplay"></iframe>
+                                {:else}
+                                    <img class="w-full h-full object-cover" src="https://img.youtube.com/vi/QWZp2WVukkY/hqdefault.jpg" alt="Enkeldans 2" loading="lazy" />
+                                    <div class="absolute inset-0 flex items-center justify-center">
+                                        <svg viewBox="0 0 68 48" class="w-16 h-11 drop-shadow-lg group-hover:scale-110 transition-transform" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <rect width="68" height="48" rx="12" fill="#FF0000"/>
+                                            <polygon points="26,14 26,34 46,24" fill="white"/>
+                                        </svg>
+                                    </div>
+                                {/if}
+                            </div>
+                        </div>
                     </div>
                 </div>
 
