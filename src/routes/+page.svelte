@@ -519,7 +519,7 @@
         cardForwardDays = 7;
         await tick();
         if (cardScrollEl) {
-            const offset = window.innerWidth > 768 ? 1 : 0;
+            const offset = window.innerWidth > 700 ? 1 : 0;
             cardScrollEl.scrollLeft = (cardBackDays - offset) * CARD_W;
         }
     }
