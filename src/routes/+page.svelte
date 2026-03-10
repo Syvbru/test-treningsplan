@@ -52,10 +52,11 @@
     let cardBackDays = 7;
     let cardForwardDays = 7;
     const CARD_W = 156; // w-36 (144px) + gap-3 (12px)
-
+    
     function scrollToAnchor() {
         if (!cardScrollEl) return;
-        cardScrollEl.scrollLeft = cardBackDays * CARD_W;
+        const offset = window.innerWidth >= 700 ? 1 : 0;
+        cardScrollEl.scrollLeft = (cardBackDays - offset) * CARD_W;
     }
 
     async function extendCardBack() {
