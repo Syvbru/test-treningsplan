@@ -518,7 +518,10 @@
         cardBackDays = 7;
         cardForwardDays = 7;
         await tick();
-        if (cardScrollEl) cardScrollEl.scrollLeft = cardBackDays * CARD_W;
+        if (cardScrollEl) {
+            const offset = window.innerWidth > 768 ? 1 : 0;
+            cardScrollEl.scrollLeft = (cardBackDays - offset) * CARD_W;
+        }
     }
 
     function setPeriod(val: string) {
