@@ -1,0 +1,13 @@
+{
+    "name": "Treningsplan",
+    "short_name": "Treningsplan",
+    "icons": [
+        {
+            "src": "/apple-touch-icon.png",
+            "sizes": "180x180",
+            "type": "image/png"
+        }
+    ],
+    "start_url": "/",
+    "display": "standalone"
+}
