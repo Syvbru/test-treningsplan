@@ -23,16 +23,6 @@
     let currentUtoverNavn = "";
     let currentEditPlanSheet = "";
 
-    // ── START: POP UP ALERT – NY VERSJON AV TRENINGSPLAN ────────────────────────
-    let showVersionAlert = false;
-
-    function startVersionAlertTimer() {
-        setTimeout(() => {
-            showVersionAlert = true;
-        }, 3500); // Vises 3,5 sekunder etter innlogging
-    }
-    // ── SLUTT: POP UP ALERT – NY VERSJON AV TRENINGSPLAN ────────────────────────
-
     type ModalType = "session" | "calendar" | "profile" | null;
     let activeModal: ModalType = null;
     let selectedSessionGroup: { date: string; sessions: Workout[] } | null = null;
@@ -45,6 +35,58 @@
     let statCalendarCursor: Date = startOfMonth(new Date());
     let statCalendarDays: (Date | null)[] = [];
     let lineTooltip: { x: number; y: number; label: string; hours: number } | null = null;
+
+    // ── BODY SCROLL LOCK ─────────────────────────────────────────────────────────
+    $: if (typeof document !== 'undefined') {
+        document.body.style.overflow = (activeModal || showStatCalendar) ? 'hidden' : '';
+    }
+
+    // ── SWIPE-TO-DISMISS ACTION ───────────────────────────────────────────────────
+    function swipeToDismiss(node: HTMLElement) {
+        let startY = 0;
+        let deltaY = 0;
+
+        function onStart(e: TouchEvent) {
+            startY = e.touches[0].clientY;
+            deltaY = 0;
+            node.style.transition = 'none';
+        }
+
+        function onMove(e: TouchEvent) {
+            deltaY = e.touches[0].clientY - startY;
+            if (deltaY > 0 && node.scrollTop === 0) {
+                e.preventDefault();
+                node.style.transform = `translateY(${deltaY}px)`;
+                node.style.opacity = `${1 - deltaY / 400}`;
+            }
+        }
+
+        function onEnd() {
+            node.style.transition = 'transform 0.25s ease, opacity 0.25s ease';
+            if (deltaY > 100 && node.scrollTop === 0) {
+                node.style.transform = `translateY(100%)`;
+                node.style.opacity = '0';
+                setTimeout(() => { activeModal = null; }, 220);
+            } else {
+                node.style.transform = '';
+                node.style.opacity = '';
+            }
+            deltaY = 0;
+        }
+
+        node.addEventListener('touchstart', onStart, { passive: true });
+        node.addEventListener('touchmove', onMove, { passive: false });
+        node.addEventListener('touchend', onEnd, { passive: true });
+
+        return {
+            destroy() {
+                node.removeEventListener('touchstart', onStart);
+                node.removeEventListener('touchmove', onMove);
+                node.removeEventListener('touchend', onEnd);
+                document.body.style.overflow = '';
+            }
+        };
+    }
 
     // ── CARD SCROLL STATE ────────────────────────────────────────────────────────
     let cardScrollEl: HTMLElement | null = null;
@@ -106,9 +148,6 @@
                         await Promise.all([loadWorkoutPlan(data.sheetUrl), loadFellesOkter()]);
                         await tick(); scrollToAnchor();
                     }
-                    // ── START: POP UP ALERT – start timer etter verifisert sesjon ─
-                    startVersionAlertTimer();
-                    // ── SLUTT: POP UP ALERT – start timer etter verifisert sesjon ─
                 }
                 isLoading = false;
             })
@@ -131,9 +170,6 @@
                     await Promise.all([loadWorkoutPlan(data.sheetUrl), loadFellesOkter()]);
                     await tick(); scrollToAnchor();
                 }
-                // ── START: POP UP ALERT – start timer etter vellykket innlogging ─
-                startVersionAlertTimer();
-                // ── SLUTT: POP UP ALERT – start timer etter vellykket innlogging ─
             } else { loginError = data.error || "Innlogging feilet."; }
         } catch { loginError = "Kunne ikke koble til server."; }
         finally { isLoading = false; }
@@ -635,48 +671,6 @@
 
 {#if loggedIn}
 <div class="min-h-screen bg-slate-100">
-
-    <!-- ═══════════════════════════════════════════════════════════════════════ -->
-    <!-- START: POP UP ALERT – NY VERSJON AV TRENINGSPLAN                      -->
-    <!-- Vises 5 sekunder etter innlogging. Lukkes med X-knappen.               -->
-    <!-- ═══════════════════════════════════════════════════════════════════════ -->
-    {#if showVersionAlert}
-        <div class="fixed inset-x-0 top-20 z-[200] flex justify-center px-4 pointer-events-none">
-            <div class="pointer-events-auto w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-[#A9D6E5] overflow-hidden"
-                role="alertdialog" aria-live="polite" aria-label="Ny versjon tilgjengelig">
-
-                <!-- Fargestripe øverst -->
-                <div class="h-2 w-full bg-gradient-to-r from-[#19747E] to-[#A9D6E5]"></div>
-
-                <div class="p-6">
-                    <!-- Tittel og lukk-knapp -->
-                    <div class="flex items-start justify-between gap-4 mb-3">
-                        <p class="sm: text-lg md:text-xl font-bold text-slate-800 leading-snug">Ny versjon av Treningsplan 🎉</p>
-
-                        <!-- Lukk-knapp -->
-                        <button
-                            on:click={() => showVersionAlert = false}
-                            class="flex-shrink-0 bg-slate-100 hover:bg-slate-200 rounded-lg p-2 text-slate-400 transition-colors"
-                            aria-label="Lukk varsling">
-                            <X class="h-5 w-5" />
-                        </button>
-                    </div>
-
-                    <!-- Tekstinnhold -->
-                    <p class="text-base text-slate-600 leading-relaxed">
-                        For å se utfyllende informasjon om økten, som kommentarer og hvem som har like økter må du
-                        trykke på en dag.
-                    </p>
-                    <p class="text-base text-slate-600 mt-4 leading-relaxed">
-                        Du kan skrolle frem og tilbake mellom dager sideveis.
-                    </p>
-                </div>
-            </div>
-        </div>
-    {/if}
-    <!-- ═══════════════════════════════════════════════════════════════════════ -->
-    <!-- SLUTT: POP UP ALERT – NY VERSJON AV TRENINGSPLAN                      -->
-    <!-- ═══════════════════════════════════════════════════════════════════════ -->
 
     <!-- HEADER -->
     <header class="bg-slate-100 sticky top-0 z-50">
@@ -1234,7 +1228,13 @@
             on:click={() => activeModal = null} role="button" tabindex="0"
             on:keydown={(e) => e.key === "Escape" && (activeModal = null)} aria-label="Lukk">
             <div class="bg-white w-full max-w-lg sm:rounded-3xl rounded-t-3xl max-h-[88vh] min-h-[50vh] sm:min-h-0 overflow-y-auto p-5 pb-8 relative sm:mx-4"
+                use:swipeToDismiss
                 on:click|stopPropagation role="dialog" aria-modal="true">
+
+                <!-- Drag handle (synlig kun på mobil) -->
+                <div class="sm:hidden flex justify-center mb-3 -mt-1">
+                    <div class="w-10 h-1 rounded-full bg-slate-300"></div>
+                </div>
 
                 <button on:click={() => activeModal = null}
                     class="absolute top-4 right-4 bg-slate-100 hover:bg-slate-200 rounded-lg p-1.5 text-slate-500 transition-colors">
