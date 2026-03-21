@@ -88,6 +88,64 @@
         };
     }
 
+    // ── SWIPE-TO-CLOSE (sidebar, sveip til høyre) ───────────────────────────────
+    function swipeToClose(node: HTMLElement) {
+        let startX = 0;
+        let startY = 0;
+        let deltaX = 0;
+        let tracking = false;
+
+        function onStart(e: TouchEvent) {
+            startX = e.touches[0].clientX;
+            startY = e.touches[0].clientY;
+            deltaX = 0;
+            tracking = true;
+            node.style.transition = 'none';
+        }
+
+        function onMove(e: TouchEvent) {
+            if (!tracking) return;
+            deltaX = e.touches[0].clientX - startX;
+            const deltaY = e.touches[0].clientY - startY;
+            // Only track horizontal swipe (not vertical scroll)
+            if (Math.abs(deltaY) > Math.abs(deltaX) && deltaX < 10) {
+                tracking = false;
+                return;
+            }
+            if (deltaX > 0) {
+                e.preventDefault();
+                node.style.transform = `translateX(${deltaX}px)`;
+                node.style.opacity = `${1 - deltaX / 400}`;
+            }
+        }
+
+        function onEnd() {
+            node.style.transition = 'transform 0.25s ease, opacity 0.25s ease';
+            if (deltaX > 80) {
+                node.style.transform = `translateX(100%)`;
+                node.style.opacity = '0';
+                setTimeout(() => { activeModal = null; showStyrkeSubmenu = false; }, 220);
+            } else {
+                node.style.transform = '';
+                node.style.opacity = '';
+            }
+            deltaX = 0;
+            tracking = false;
+        }
+
+        node.addEventListener('touchstart', onStart, { passive: true });
+        node.addEventListener('touchmove', onMove, { passive: false });
+        node.addEventListener('touchend', onEnd, { passive: true });
+
+        return {
+            destroy() {
+                node.removeEventListener('touchstart', onStart);
+                node.removeEventListener('touchmove', onMove);
+                node.removeEventListener('touchend', onEnd);
+            }
+        };
+    }
+
     // ── CARD SCROLL STATE ────────────────────────────────────────────────────────
     let cardScrollEl: HTMLElement | null = null;
     let cardAnchor: Date = startOfDay(new Date());
@@ -762,7 +820,7 @@
                             }}
                         >
                             <!-- Date row -->
-                            <div class="flex items-center justify-between mb-2">
+                            <div class="flex items-center justify-between w-full mb-2">
                                 <span class="text-xs font-semibold capitalize {isT ? 'text-[#19747E]' : 'text-[#A9D6E5]'}">
                                     {isT ? "I dag" : format(day, "EEE", { locale: nb })}
                                 </span>
@@ -796,7 +854,7 @@
 
                                 <!-- Footer: only on non-rest days -->
                                 {#if !isRest}
-                                    <div class="flex items-center justify-between pt-1.5 mt-3 border-t {isT ? 'text-[#19747E]' : 'text-[#A9D6E5]'}">
+                                    <div class="flex items-center justify-between w-full pt-1.5 mt-3 border-t {isT ? 'text-[#19747E]' : 'text-[#A9D6E5]'}">
                                         <span class="flex items-center gap-0.5 text-xs font-semibold {isT ? 'text-[#19747E]' : 'text-[#A9D6E5]'}">
                                             <User class="h-3 w-3" /> {fellesCountByDay.get(dayIso) ?? 0}
                                         </span>
@@ -1224,20 +1282,21 @@
 
     <!-- SESSION DETAIL MODAL -->
     {#if activeModal === "session" && selectedSessionGroup}
-        <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40 backdrop-blur-sm"
+        <div class="fixed inset-0 z-50 flex items-end lg:items-center justify-center bg-slate-900/40 backdrop-blur-sm"
             on:click={() => activeModal = null} role="button" tabindex="0"
             on:keydown={(e) => e.key === "Escape" && (activeModal = null)} aria-label="Lukk">
-            <div class="bg-white w-full max-w-lg sm:rounded-3xl rounded-t-3xl max-h-[88vh] min-h-[50vh] sm:min-h-0 overflow-y-auto p-5 pb-8 relative sm:mx-4"
+            <div class="bg-white w-full lg:max-w-2xl lg:mx-auto lg:rounded-3xl rounded-t-3xl max-h-[88vh] min-h-[50vh] lg:min-h-0 overflow-y-auto lg:my-8"
                 use:swipeToDismiss
                 on:click|stopPropagation role="dialog" aria-modal="true">
+                <div class="max-w-lg mx-auto lg:max-w-none p-5 pb-8 relative">
 
-                <!-- Drag handle (synlig kun på mobil) -->
-                <div class="sm:hidden flex justify-center mb-3 -mt-1">
-                    <div class="w-10 h-1 rounded-full bg-slate-300"></div>
+                <!-- Drag handle (synlig på mobil og nettbrett) -->
+                <div class="lg:hidden flex justify-center mb-5 -mt-1">
+                    <div class="w-24 h-[5px] rounded-full bg-slate-300"></div>
                 </div>
 
                 <button on:click={() => activeModal = null}
-                    class="absolute top-4 right-4 bg-slate-100 hover:bg-slate-200 rounded-lg p-1.5 text-slate-500 transition-colors">
+                    class="hidden lg:flex absolute top-4 right-4 bg-slate-100 hover:bg-slate-200 rounded-lg p-1.5 text-slate-500 transition-colors">
                     <X class="h-5 w-5" />
                 </button>
 
@@ -1310,6 +1369,7 @@
                         {/if}
                     </div>
                 {/if}
+                </div>
             </div>
         </div>
     {/if}
@@ -1387,6 +1447,7 @@
             role="button" tabindex="0"
             on:keydown={(e) => e.key === "Escape" && (activeModal = null)} aria-label="Lukk">
             <div class="bg-white h-full w-72 max-w-[85vw] shadow-2xl flex flex-col"
+                use:swipeToClose
                 on:click|stopPropagation role="dialog" aria-modal="true">
 
                 <div class="bg-[#19747E] px-5 py-6 flex items-center gap-3">
