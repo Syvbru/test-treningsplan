@@ -11,7 +11,7 @@
         Calendar, Clock, Zap, Dumbbell, BookOpen, Timer, Heart,
         BatteryCharging, User, Lock, ChevronDown, ChevronUp, Users,
         ChevronLeft, ChevronRight, X, LogOut, ArrowLeft, SquarePen,
-        FileText, Video, NotepadText, LineChart, MessageSquare
+        FileText, Video, NotepadText, LineChart, MessageSquare, Moon
     } from "lucide-svelte";
 
     let username = "";
@@ -359,26 +359,29 @@
 
     function endOfDayIncl(d: Date) { const e = new Date(d); e.setHours(23,59,59,999); return e; }
 
-    function getWorkoutInfo(title: string) {
+    // ── GETWORKOUTINFO ────────────────────────────────────────────────────────────
+    // bg      = Tailwind-klasse for lys modus
+    // darkBg  = hex-bakgrunnsfarge for mørk modus (kan tilpasses fritt her)
+    // hexBg   = hex for lys modus (for eventuelle inline-stiler)
+    // ─────────────────────────────────────────────────────────────────────────────
+    function getWorkoutInfo(title: string, dark: boolean = false) {
         const lower = title.toLowerCase();
-        if (lower.includes("intervall"))
-            return { icon: Timer, color: "text-red-600", bg: "bg-red-100", hex: "#B91C1C", hexBg: "#FEF2F2" };
         const isHard = lower.includes("motbakkeløp") || lower.includes("sprint") || lower.includes("sprintøkt") || lower.includes("distanseøkt") || /(rennet|(?<!lang)renn(?!forbered))/u.test(lower) || lower.includes("dsv-cup") || lower.includes("km ") || lower.includes(" km") || lower.includes("birken") || lower.includes("klubbmesterskap") || lower.includes("skifestival") || lower.includes("vestmarka opp") || lower.includes("gjelleråsbakken") || lower.includes("askerspurten") || lower.includes("oslo marat") || lower.includes("terrengløp")|| lower.includes("10 for grete") || lower.includes("kong harald");
-        if (isHard)
-            return { icon: Timer, color: "text-red-600", bg: "bg-red-100", hex: "#B91C1C", hexBg: "#FEF2F2" };
+        if (lower.includes("intervall") || isHard)
+            return { icon: Timer, color: "text-red-600", bg: "bg-red-100", hex: "#B91C1C", hexBg: "#FEF2F2", darkBg: "bg-red-500" };
         if (lower.includes("hvile"))
-            return { icon: BatteryCharging, color: "text-green-600", bg: "bg-green-100", hex: "#15803D", hexBg: "#F0FDF4" };
+            return { icon: BatteryCharging, color: "text-green-600", bg: "bg-green-100", hex: "#15803D", hexBg: "#F0FDF4", darkBg: "bg-green-500" };
         if (lower.includes("langtur"))
-            return { icon: Heart, color: "text-[#08BFB0]", bg: "bg-[#c2fffa]/70", hex: "#0F766E", hexBg: "#F0FDFA" };
+            return { icon: Heart, color: "text-[#08BFB0]", bg: "bg-[#c2fffa]/70", hex: "#0F766E", hexBg: "#F0FDFA", darkBg: "bg-teal-400" };
         if (lower.includes("hurtighet"))
-            return { icon: Zap, color: "text-[#A9D6E5]", bg: "bg-[#EBFAFF]/60", hex: "#0369A1", hexBg: "#F0F9FF" };
+            return { icon: Zap, color: "text-[#A9D6E5]", bg: "bg-[#EBFAFF]/60", hex: "#0369A1", hexBg: "#F0F9FF", darkBg: "bg-sky-100" };
         if (lower.includes("teknikk"))
-            return { icon: BookOpen, color: "text-[#A9D6E5]", bg: "bg-[#EBFAFF]/60", hex: "#0369A1", hexBg: "#F0F9FF" };
+            return { icon: BookOpen, color: "text-[#A9D6E5]", bg: "bg-[#EBFAFF]/60", hex: "#0369A1", hexBg: "#F0F9FF", darkBg: "bg-sky-100" };
         if (lower.includes("styrke") || lower.includes("basis"))
-            return { icon: Dumbbell, color: "text-yellow-600", bg: "bg-yellow-100", hex: "#A16207", hexBg: "#FEFCE8" };
+            return { icon: Dumbbell, color: "text-yellow-600", bg: "bg-yellow-100", hex: "#A16207", hexBg: "#FEFCE8", darkBg: "bg-yellow-300" };
         if (lower.includes("rennforberedende"))
-            return { icon: Heart, color: "text-[#A9D6E5]", bg: "bg-[#EBFAFF]/60", hex: "#0369A1", hexBg: "#F0F9FF" };
-        return { icon: Heart, color: "text-[#A9D6E5]", bg: "bg-[#EBFAFF]/60", hex: "#0369A1", hexBg: "#F0F9FF" };
+            return { icon: Heart, color: "text-[#A9D6E5]", bg: "bg-[#EBFAFF]/60", hex: "#0369A1", hexBg: "#F0F9FF", darkBg: "bg-sky-100" };
+        return { icon: Heart, color: "text-[#A9D6E5]", bg: "bg-[#EBFAFF]/60", hex: "#0369A1", hexBg: "#F0F9FF", darkBg: "bg-sky-100" };
     }
 
     // Extract movement-form title from a workout name for the card heading
@@ -677,6 +680,10 @@
         { title: "Kort styrkeøkt ben", url: "/pdf/KortStyrkeøktBen.pdf" },
     ];
 
+    // ── DARK MODE
+    let darkMode = typeof localStorage !== 'undefined' && localStorage.getItem('dk') === '1';
+    $: typeof localStorage !== 'undefined' && localStorage.setItem('dk', darkMode ? '1' : '0');
+
     // ── YOUTUBE FACADE ───────────────────────────────────────────────────────────
     let activeVideos = new Set<string>();
     function activateVideo(id: string) {
@@ -685,25 +692,47 @@
     // ── SLUTT: YOUTUBE FACADE ────────────────────────────────────────────────────
 </script>
 
+<style>
+  /* ── FARGEPALETT ──────────────────────────────────────────────────────────────
+     --surface (svak bakgrunnsfarge):
+       lys:  #F1F5F9  (nesten hvit, subtil løftet flate)
+       mørk: #1E3045  (lys-grå tilsvarende kalender frem/tilbake-knapper)
+  ─────────────────────────────────────────────────────────────────────────── */
+  :global(.lt){--p1:#19747E;--p2:#A9D6E5;--p3:#D1E8E2;--bg:#F1F5F9;--card:#ffffff;--br:#E2E8F0;--surface:#F1F5F9}
+  :global(.dk){--p1:#92e811;--p2:#cbff71;--p3:#1f3910;--bg:#0D1B2A;--card:#132030;--br:#1E3448;--surface:#1E3045}
+  /* Bakgrunnsfarger i mørkmodus */
+  :global(.dk .bg-white){background-color:var(--card)!important}
+  :global(.dk .bg-slate-50){background-color:var(--surface)!important}
+  :global(.dk .bg-slate-100){background-color:var(--surface)!important}
+  /* Hover-tilstander i mørkmodus – svak bakgrunn i stedet for hvittone */
+  :global(.dk .hover\:bg-slate-50:hover){background-color:var(--surface)!important}
+  :global(.dk .hover\:bg-slate-100:hover){background-color:var(--br)!important}
+  :global(.dk .hover\:bg-slate-200:hover){background-color:var(--br)!important}
+  :global(.dk .hover\:bg-red-50:hover){background-color:#2d0a0a!important}
+  :global(.dk .border-slate-200),:global(.dk .border-slate-100){border-color:var(--br)!important}
+  :global(.dk .text-slate-800),:global(.dk .text-slate-700),:global(.dk .text-slate-600){color:#CBD5E1!important}
+  :global(.dk .text-slate-500),:global(.dk .text-slate-400),:global(.dk .text-slate-300){color:#64748B!important}
+</style>
+
 {#if !loggedIn}
-<div class="fixed inset-0 flex items-center justify-center bg-gradient-to-br from-[#19747E] via-[#19747E]/80 to-[#19747E]/60 p-4">
+<div class="fixed inset-0 flex items-center justify-center p-4" style="background:linear-gradient(135deg,#19747E,rgba(25,116,126,.8),rgba(25,116,126,.6))">
     <div class="w-full max-w-sm bg-white rounded-3xl p-8 shadow-2xl">
         <h2 class="text-center font-bold text-3xl mb-1">
-            <span class="text-[#A9D6E5] italic">TRENINGS</span><span class="text-[#19747E] italic">PLAN</span>
+            <span class="text-[var(--p2)] italic">TRENINGS</span><span class="text-[var(--p1)] italic">PLAN</span>
         </h2>
         <p class="text-center text-slate-400 text-sm mb-8">Logg inn for å se din treningsplan</p>
 
         <div class="mb-4">
             <label for="username" class="block text-xs font-semibold text-slate-500 uppercase tracking-widest mb-1.5">Brukernavn</label>
             <input id="username" type="text" bind:value={username} disabled={isLoading}
-                class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-base focus:border-[#19747E]/60 focus:ring-2 focus:ring-[#19747E] outline-none transition disabled:opacity-60"
+                class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-base focus:border-[var(--p1)]/60 focus:ring-2 focus:ring-[color:var(--p1)] outline-none transition disabled:opacity-60"
                 placeholder="Ditt brukernavn" autocomplete="username" />
         </div>
         <div class="mb-6">
             <label for="password" class="block text-xs font-semibold text-slate-500 uppercase tracking-widest mb-1.5">Passord</label>
             <input id="password" type="password" bind:value={password} disabled={isLoading}
                 on:keydown={(e) => { if (e.key === "Enter") handleLogin(); }}
-                class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-base focus:border-[#19747E]/60 focus:ring-2 focus:ring-[#19747E] outline-none transition disabled:opacity-60"
+                class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-base focus:border-[var(--p1)]/60 focus:ring-2 focus:ring-[color:var(--p1)] outline-none transition disabled:opacity-60"
                 placeholder="••••••••" autocomplete="current-password" />
         </div>
 
@@ -712,7 +741,7 @@
         {/if}
 
         <button on:click={handleLogin} disabled={isLoading || !username || !password}
-            class="w-full flex items-center justify-center gap-2 rounded-xl bg-[#19747E] text-white py-3 text-base font-bold tracking-wide transition disabled:opacity-40 disabled:cursor-not-allowed">
+            class="w-full flex items-center justify-center gap-2 rounded-xl bg-[var(--p1)] text-white py-3 text-base font-bold tracking-wide transition disabled:opacity-40 disabled:cursor-not-allowed">
             {#if isLoading}
                 <svg class="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -728,29 +757,29 @@
 {/if}
 
 {#if loggedIn}
-<div class="min-h-screen bg-slate-100">
+<div class="min-h-screen {darkMode?'dk':'lt'}" style="background-color:var(--bg)">
 
     <!-- HEADER -->
-    <header class="bg-slate-100 sticky top-0 z-50">
+    <header class="sticky top-0 z-50" style="background-color:var(--bg)">
         <div class="mx-auto max-w-5xl px-4 pt-5 pb-2">
             <div class="flex justify-between items-end">
                 <div>
-                    <p class="text-xs font-semibold tracking-widest text-[#19747E] uppercase mb-0.5">
+                    <p class="text-xs font-semibold tracking-widest text-[var(--p1)] uppercase mb-0.5">
                         {format(activeDate, "EEEE d. MMMM", { locale: nb })}
                     </p>
                     <h1 class="text-3xl md:text-4xl font-bold italic leading-none tracking-tight">
-                        <span class="text-[#A9D6E5]">TRENINGS</span><span class="text-[#19747E]">PLAN</span>
+                        <span class="text-[var(--p2)]">TRENINGS</span><span class="text-[var(--p1)]">PLAN</span>
                     </h1>
                 </div>
                 <div class="flex gap-2 self-end">
                     <button on:click={openCalendarModal}
-                        class="bg-white text-[#19747E] rounded-full p-2 md:p-2.5 transition-colors border border-transparent hover:border-[#19747E]"
+                        class="bg-white text-[var(--p1)] rounded-full p-2 md:p-2.5 transition-colors border border-transparent hover:border-[var(--p1)]"
                         aria-label="Kalender">
                         <Calendar class="h-4 w-4 md:h-5 md:w-5" />
                     </button>
 
                     <button on:click={() => { activeModal = "profile"; showStyrkeSubmenu = false; }}
-                        class="bg-white text-[#19747E] rounded-full p-2 md:p-2.5 transition-colors border border-transparent hover:border-[#19747E]"
+                        class="bg-white text-[var(--p1)] rounded-full p-2 md:p-2.5 transition-colors border border-transparent hover:border-[var(--p1)]"
                         aria-label="Profil">
                         <User class="h-4 w-4 md:h-5 md:w-5" />
                     </button>
@@ -762,9 +791,9 @@
                     <input type="text" bind:value={currentUtoverNavn}
                         on:keydown={(e) => { if (e.key === "Enter") searchUtoverByName(); }}
                         placeholder="Søk etter utøver…"
-                        class="flex-1 rounded-full bg-[#dcf1f7]/80 border-0 px-4 py-2 text-[#19747E] placeholder-[#19747E] text-sm focus:ring-2 focus:ring-[#19747E] outline-none transition" />
+                        class="flex-1 rounded-full border px-4 py-2 text-sm focus:ring-2 focus:ring-[color:var(--p1)] outline-none transition bg-[var(--card)] border-[var(--p1)/40] text-[var(--p1)] placeholder-[color:var(--p1)/50]" />
                     <button on:click={searchUtoverByName} disabled={isLoading || !currentUtoverNavn.trim()}
-                        class="bg-[#dcf1f7]/80 hover:bg-[#A9D6E5] text-[#19747E] rounded-full px-4 py-2 text-sm font-semibold transition disabled:opacity-50">
+                        class="rounded-full px-4 py-2 text-sm font-semibold transition disabled:opacity-50 bg-[var(--p1)] hover:bg-[var(--p1)]/80 text-[var(--card)]">
                         {isLoading ? "…" : "Søk"}
                     </button>
                 </div>
@@ -781,8 +810,8 @@
         <!-- MINE TRENINGSØKTER -->
         <section>
             <div class="flex items-center justify-between mb-3">
-                <h2 class="text-base font-bold text-[#19747E]">Mine Treningsøkter:</h2>
-                <span class="text-xs font-bold text-[#A9D6E5] px-2.5 py-1 tracking-wide">UKE {currentWeekNum}</span>
+                <h2 class="text-base font-bold text-[var(--p1)]">Mine Treningsøkter:</h2>
+                <span class="text-xs font-bold text-[var(--p2)] px-2.5 py-1 tracking-wide">UKE {currentWeekNum}</span>
             </div>
 
             <!-- Card scroll row with arrow buttons inside -->
@@ -793,7 +822,7 @@
 
                     <!-- Left: extend back in time – only visible at the far left end -->
                     <button on:click={extendCardBack}
-                        class="flex-shrink-0 snap-start self-center w-10 h-10 flex items-center justify-center bg-white border border-slate-200 hover:border-[#19747E] hover:text-[#19747E]/80 text-slate-400 rounded-xl shadow-sm transition-colors">
+                        class="flex-shrink-0 snap-start self-center w-10 h-10 flex items-center justify-center bg-white border border-slate-200 hover:border-[var(--p1)] hover:text-[var(--p1)]/80 text-slate-400 rounded-xl shadow-sm transition-colors">
                         <ChevronLeft class="h-6 w-6" />
                     </button>
 
@@ -809,10 +838,10 @@
                         <button
                             class="flex-shrink-0 snap-start w-36 rounded-2xl p-3 text-left transition-all duration-150 flex flex-col
                                 {isT
-                                    ? 'bg-[#D1E8E2] border-2 border-[#19747E]'
+                                    ? 'bg-[var(--p3)] border-2 border-[var(--p1)]'
                                     : isAct
-                                        ? 'bg-white border-2 border-[#19747E]'
-                                        : 'bg-white border border-slate-200 hover:border-[#19747E]'}"
+                                        ? 'bg-white border-2 border-[var(--p1)]'
+                                        : 'bg-white border border-slate-200 hover:border-[var(--p1)]'}"
                             on:click={() => {
                                 selectedDate = startOfDay(day);
                                 if (dw.length > 0) openSessionDetail(dayIso, dw);
@@ -821,17 +850,17 @@
                         >
                             <!-- Date row -->
                             <div class="flex items-center justify-between w-full mb-2">
-                                <span class="text-xs font-semibold capitalize {isT ? 'text-[#19747E]' : 'text-[#A9D6E5]'}">
+                                <span class="text-xs font-semibold capitalize {isT ? 'text-[var(--p1)]' : 'text-[var(--p2)]'}">
                                     {isT ? "I dag" : format(day, "EEE", { locale: nb })}
                                 </span>
-                                <span class="text-xs font-bold {isT ? 'text-[#19747E]' : 'text-[#A9D6E5]'}">{format(day, "dd.MM")}</span>
+                                <span class="text-xs font-bold {isT ? 'text-[var(--p1)]' : 'text-[var(--p2)]'}">{format(day, "dd.MM")}</span>
                             </div>
 
                             {#if dw.length > 0}
                                 <!-- Movement-form heading(s): UPPERCASE ITALIC -->
                                 <div class="mb-2">
                                     {#each dw as w, wi}
-                                        <p class="text-sm font-bold italic uppercase leading-tight {isT ? 'text-[#19747E]' : 'text-[#A9D6E5]'}">
+                                        <p class="text-sm font-bold italic uppercase leading-tight {isT ? 'text-[var(--p1)]' : 'text-[var(--p2)]'}">
                                             {getCardTitle(w.title)}{wi === 0 && isDouble ? " +" : ""}
                                         </p>
                                     {/each}
@@ -840,26 +869,26 @@
                                 <!-- Icons — no background -->
                                 <div class="flex gap-1.5 flex-wrap mb-2">
                                     {#each dw as w}
-                                        {@const info = getWorkoutInfo(w.title)}
-                                        <svelte:component this={info.icon} class="h-6 w-6 {isT ? 'text-[#19747E]' : 'text-[#A9D6E5]'}" />
+                                        {@const info = getWorkoutInfo(w.title, darkMode)}
+                                        <svelte:component this={info.icon} class="h-6 w-6 {isT ? 'text-[var(--p1)]' : 'text-[var(--p2)]'}" />
                                     {/each}
                                 </div>
 
                                 <!-- Full workout names -->
                                 <div class="flex flex-col {isDouble ? 'gap-2' : 'gap-0.5'} flex-1">
                                     {#each dw as w}
-                                        <p class="text-xs leading-snug {isT ? 'text-[#19747E]' : 'text-[#A9D6E5]'}">{w.title}</p>
+                                        <p class="text-xs leading-snug {isT ? 'text-[var(--p1)]' : 'text-[var(--p2)]'}">{w.title}</p>
                                     {/each}
                                 </div>
 
                                 <!-- Footer: only on non-rest days -->
                                 {#if !isRest}
-                                    <div class="flex items-center justify-between w-full pt-1.5 mt-3 border-t {isT ? 'text-[#19747E]' : 'text-[#A9D6E5]'}">
-                                        <span class="flex items-center gap-0.5 text-xs font-semibold {isT ? 'text-[#19747E]' : 'text-[#A9D6E5]'}">
+                                    <div class="flex items-center justify-between w-full pt-1.5 mt-3 border-t {isT ? 'text-[var(--p1)]' : 'text-[var(--p2)]'}">
+                                        <span class="flex items-center gap-0.5 text-xs font-semibold {isT ? 'text-[var(--p1)]' : 'text-[var(--p2)]'}">
                                             <User class="h-3 w-3" /> {fellesCountByDay.get(dayIso) ?? 0}
                                         </span>
                                         {#if hasComment}
-                                            <span class="{isT ? 'text-[#19747E]' : 'text-[#A9D6E5]'}">
+                                            <span class="{isT ? 'text-[var(--p1)]' : 'text-[var(--p2)]'}">
                                                 <MessageSquare class="h-3.5 w-3.5" />
                                             </span>
                                         {:else}
@@ -868,7 +897,7 @@
                                     </div>
                                 {/if}
                             {:else}
-                            <div class="flex-1 flex flex-col items-center justify-center gap-1 text-center px-1 {isT ? 'text-[#19747E]/30' : 'text-slate-300'}">
+                            <div class="flex-1 flex flex-col items-center justify-center gap-1 text-center px-1 {isT ? 'text-[var(--p1)]/50' : 'text-slate-300'}">
                                 <span class="text-xs leading-tight">Ingen økt er lagt inn enda…</span>
                             </div>
                             {/if}
@@ -877,7 +906,7 @@
 
                     <!-- Right: extend forward in time – only visible at the far right end -->
                     <button on:click={extendCardForward}
-                        class="flex-shrink-0 snap-start self-center w-10 h-10 flex items-center justify-center bg-white border border-slate-200 hover:border-[#19747E] hover:text-[#19747E]/80 text-slate-400 rounded-xl shadow-sm transition-colors">
+                        class="flex-shrink-0 snap-start self-center w-10 h-10 flex items-center justify-center bg-white border border-slate-200 hover:border-[var(--p1)] hover:text-[var(--p1)]/80 text-slate-400 rounded-xl shadow-sm transition-colors">
                         <ChevronRight class="h-6 w-6" />
                     </button>
                 </div>
@@ -887,18 +916,18 @@
         <!-- STATISTIKK -->
         <section>
             <div class="mb-3">
-                <h2 class="text-base font-bold text-[#19747E] mb-2">Statistikk:</h2>
+                <h2 class="text-base font-bold text-[var(--p1)] mb-2">Statistikk:</h2>
                 <div class="flex items-center gap-2">
                     <!-- Prev / Next navigation -->
                     <button on:click={prevStatPeriod}
-                        class="bg-white border border-slate-200 hover:border-[#19747E] text-slate-400 hover:text-[#19747E] rounded-lg p-1.5 transition-colors">
+                        class="bg-white border border-slate-200 hover:border-[var(--p1)] text-slate-400 hover:text-[var(--p1)] rounded-lg p-1.5 transition-colors">
                         <ChevronLeft class="h-4 w-4" />
                     </button>
 
                     <!-- Period dropdown -->
                     <div class="relative">
                         <button on:click={() => showStatDropdown = !showStatDropdown}
-                            class="flex items-center gap-1.5 bg-white border border-slate-200 hover:border-[#19747E] rounded-lg px-3 py-1.5 text-sm font-semibold text-[#19747E] transition-colors min-w-[130px] justify-between">
+                            class="flex items-center gap-1.5 bg-white border border-slate-200 hover:border-[var(--p1)] rounded-lg px-3 py-1.5 text-sm font-semibold text-[var(--p1)] transition-colors min-w-[130px] justify-between">
                             <span class="capitalize">{statPeriodLabel}</span>
                             <ChevronDown class="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
                         </button>
@@ -906,7 +935,7 @@
                             <div class="absolute left-0 top-full mt-1 z-30 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden min-w-[120px]">
                                 {#each [["uke","Uke"],["maaned","Måned"],["sesong","Sesong"]] as [val, lbl]}
                                     <button on:click={() => setPeriod(val)}
-                                        class="w-full text-left px-4 py-2.5 text-sm font-semibold transition-colors {statPeriod === val ? 'bg-[#19747E] text-white' : 'text-slate-600 hover:bg-slate-50'}">
+                                        class="w-full text-left px-4 py-2.5 text-sm font-semibold transition-colors {statPeriod === val ? 'bg-[var(--p1)] text-white' : 'text-slate-600 hover:bg-slate-50'}">
                                         {lbl}
                                     </button>
                                 {/each}
@@ -915,13 +944,13 @@
                     </div>
 
                     <button on:click={nextStatPeriod}
-                        class="bg-white border border-slate-200 hover:border-[#19747E] text-slate-400 hover:text-[#19747E] rounded-lg p-1.5 transition-colors">
+                        class="bg-white border border-slate-200 hover:border-[var(--p1)] text-slate-400 hover:text-[var(--p1)] rounded-lg p-1.5 transition-colors">
                         <ChevronRight class="h-4 w-4" />
                     </button>
 
                     <!-- Calendar picker button -->
                     <button on:click={openStatCalendar}
-                        class="bg-white border border-slate-200 hover:border-[#19747E] text-slate-400 hover:text-[#19747E] rounded-lg p-1.5 transition-colors">
+                        class="bg-white border border-slate-200 hover:border-[var(--p1)] text-slate-400 hover:text-[var(--p1)] rounded-lg p-1.5 transition-colors">
                         <Calendar class="h-4 w-4" />
                     </button>
                 </div>
@@ -937,19 +966,19 @@
                         on:click|stopPropagation role="dialog" aria-modal="true">
                         <div class="flex justify-end mb-2">
                             <button on:click={() => showStatCalendar = false}
-                                class="bg-slate-100 hover:bg-slate-200 rounded-lg p-1.5 text-slate-500 transition-colors">
+                                class="bg-[var(--surface)] hover:bg-[var(--surface)]/50 rounded-lg p-1.5 text-slate-500 transition-colors">
                                 <X class="h-5 w-5" />
                             </button>
                         </div>
                         <div class="flex items-center justify-between mb-4">
                             <button on:click={() => { statCalendarCursor = subMonths(statCalendarCursor, 1); updateStatCalendarDays(); }}
-                                class="bg-slate-100 hover:bg-[#A9D6E5] rounded-xl p-2 transition-colors">
-                                <ChevronLeft class="h-4 w-4 text-[#19747E]" />
+                                class="bg-[var(--surface)] hover:bg-[var(--surface)]/50 rounded-xl p-2 transition-colors">
+                                <ChevronLeft class="h-4 w-4 text-[var(--p1)]" />
                             </button>
                             <h3 class="font-bold text-slate-800 capitalize">{format(statCalendarCursor, "MMMM yyyy", { locale: nb })}</h3>
                             <button on:click={() => { statCalendarCursor = addMonths(statCalendarCursor, 1); updateStatCalendarDays(); }}
-                                class="bg-slate-100 hover:bg-[#A9D6E5] rounded-xl p-2 transition-colors">
-                                <ChevronRight class="h-4 w-4 text-[#19747E]" />
+                                class="bg-[var(--surface)] hover:bg-[var(--surface)]/50 rounded-xl p-2 transition-colors">
+                                <ChevronRight class="h-4 w-4 text-[var(--p1)]" />
                             </button>
                         </div>
                         <div class="grid grid-cols-7 gap-1 mb-1">
@@ -964,7 +993,7 @@
                                     {@const isSel = isSameDay(d, statAnchor)}
                                     <button on:click={() => selectStatCalendarDate(d)}
                                         class="aspect-square rounded-lg text-sm flex items-center justify-center transition-colors
-                                            {isSel ? 'bg-[#19747E] text-white font-bold' : isT ? 'bg-[#A9D6E5] text-[#19747E] font-bold' : 'hover:bg-slate-100 text-slate-700'}">
+                                            {isSel ? 'bg-[var(--p1)] text-white font-bold' : isT ? 'bg-[var(--p2)] text-[var(--p1)] font-bold' : 'hover:bg-slate-100 text-slate-700'}">
                                         {format(d, "d")}
                                     </button>
                                 {:else}
@@ -973,7 +1002,7 @@
                             {/each}
                         </div>
                         <button on:click={() => selectStatCalendarDate(today)}
-                            class="w-full mt-4 py-2.5 rounded-xl border border-[#19747E] bg-[#D1E8E2] text-[#19747E] text-sm font-semibold transition-colors">
+                            class="w-full mt-4 py-2.5 rounded-xl border border-[var(--p1)] bg-[var(--p3)] text-[var(--p1)] text-sm font-semibold transition-colors">
                             Gå til i dag
                         </button>
                     </div>
@@ -999,7 +1028,7 @@
                     <!-- Antall økter at the bottom -->
                     <div class="text-center pt-2 border-t border-slate-100">
                         <span class="text-sm text-slate-500 font-medium ml-1.5">Antall økter: </span>
-                        <span class="text-md font-bold text-[#19747E]">{barStats.total}</span>
+                        <span class="text-md font-bold text-[var(--p1)]">{barStats.total}</span>
                     </div>
                 </div>
 
@@ -1011,8 +1040,8 @@
                             on:click={() => lineTooltip = null}>
                             <defs>
                                 <linearGradient id="lg" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%" stop-color="#0F766E" stop-opacity="0.25"/>
-                                    <stop offset="100%" stop-color="#0F766E" stop-opacity="0.02"/>
+                                    <stop offset="0%" stop-color="var(--p1)" stop-opacity="0.25"/>
+                                    <stop offset="100%" stop-color="var(--p1)" stop-opacity="0.02"/>
                                 </linearGradient>
                             </defs>
                             <path d={lineArea} fill="url(#lg)"/>
@@ -1021,7 +1050,7 @@
                                 <line x1="28" y1={ty} x2="258" y2={ty} stroke="#E2E8F0" stroke-width="0.7"/>
                                 <text x="26" y={ty + 2} font-size="6" fill="#94A3B8" text-anchor="end">{tick}t</text>
                             {/each}
-                            <polyline points={linePoly} fill="none" stroke="#0F766E" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+                            <polyline points={linePoly} fill="none" stroke="var(--p1)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
                             {#each linePts as p}
                                 <!-- Invisible wider hit area -->
                                 <circle cx={p.x} cy={p.y} r="10" fill="transparent"
@@ -1030,7 +1059,7 @@
                                     on:click|stopPropagation={() => lineTooltip = p}
                                     class="cursor-pointer" />
                                 <circle cx={p.x} cy={p.y} r={lineTooltip?.label === p.label ? 4.5 : 3}
-                                    fill="white" stroke="#0F766E"
+                                    fill="var(--card)" stroke="var(--p1)"
                                     stroke-width={lineTooltip?.label === p.label ? 2.5 : 1.5}
                                     style="transition: r 0.1s, stroke-width 0.1s; pointer-events: none;" />
                                 <text x={p.x} y="108" text-anchor="middle" font-size="6.5" fill="#64748B">{p.label}</text>
@@ -1045,7 +1074,7 @@
                                 {@const hh = Math.floor(totalMin / 60)}
                                 {@const mm = totalMin % 60}
                                 {@const lbl = hh > 0 && mm > 0 ? `${hh}t ${mm}m` : hh > 0 ? `${hh}t` : `${mm}m`}
-                                <rect x={tx - 16} y={ty - 8} width="32" height="12" rx="4" fill="#0F766E"/>
+                                <rect x={tx - 16} y={ty - 8} width="32" height="12" rx="4" fill="var(--p1)"/>
                                 <text x={tx} y={ty + 1} text-anchor="middle" font-size="6.5" font-weight="700" fill="white">{lbl}</text>
                             {/if}
                         </svg>
@@ -1055,7 +1084,7 @@
                     <!-- Timer totalt at the bottom -->
                     <div class="text-center mt-1 pt-2 border-t border-slate-100">
                     <span class="text-sm text-slate-500 font-medium ml-1.5">Timer totalt:</span>
-                        <span class="text-md font-bold text-[#19747E]">{barStats.totalHours}t{barStats.totalMins > 0 ? ` ${barStats.totalMins}min` : ""}</span>
+                        <span class="text-md font-bold text-[var(--p1)]">{barStats.totalHours}t{barStats.totalMins > 0 ? ` ${barStats.totalMins}min` : ""}</span>
                     </div>
                 </div>
             </div>
@@ -1063,13 +1092,13 @@
 
         <!-- TEKNIKKVIDEOER -->
         <section>
-            <h2 class="text-base font-bold text-[#19747E] mb-3">Teknikkvideoer:</h2>
+            <h2 class="text-base font-bold text-[var(--p1)] mb-3">Teknikkvideoer:</h2>
 
             <div class="flex flex-col gap-3">
 
                 <!-- Klassisk: Diagonal -->
                 <div class="bg-white rounded-2xl border border-slate-200 p-4">
-                    <p class="text-md font-bold text-[#19747E] mb-3">Klassisk: <span class="text-[#A9D6E5] italic"> Diagonal </span> </p>
+                    <p class="text-md font-bold text-[var(--p1)] mb-3">Klassisk: <span class="text-[var(--p2)] italic"> Diagonal </span> </p>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
                         <div class="rounded-xl overflow-hidden shadow-sm">
                             <div class="aspect-video relative cursor-pointer group" on:click={() => activateVideo("Z2oNfG4eulQ")}>
@@ -1106,7 +1135,7 @@
 
                 <!-- Klassisk: Staking -->
                 <div class="bg-white rounded-2xl border border-slate-200 p-4">
-                    <p class="text-md font-bold text-[#19747E] mb-3">Klassisk: <span class="text-[#A9D6E5] italic"> Staking </span></p>
+                    <p class="text-md font-bold text-[var(--p1)] mb-3">Klassisk: <span class="text-[var(--p2)] italic"> Staking </span></p>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
                         <div class="rounded-xl overflow-hidden shadow-sm">
                             <div class="aspect-video relative cursor-pointer group" on:click={() => activateVideo("D_hlp-buPhA")}>
@@ -1143,7 +1172,7 @@
 
                 <!-- Klassisk: Dobbeltak med fraspark -->
                 <div class="bg-white rounded-2xl border border-slate-200 p-4">
-                    <p class="text-md font-bold text-[#19747E] mb-3">Klassisk: <span class="text-[#A9D6E5] italic"> Dobbeltak med fraspark </span></p>
+                    <p class="text-md font-bold text-[var(--p1)] mb-3">Klassisk: <span class="text-[var(--p2)] italic"> Dobbeltak med fraspark </span></p>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
                         <div class="rounded-xl overflow-hidden shadow-sm">
                             <div class="aspect-video relative cursor-pointer group" on:click={() => activateVideo("7SZn1vDG_WY")}>
@@ -1165,7 +1194,7 @@
 
                 <!-- Skøyting: Dobbeldans -->
                 <div class="bg-white rounded-2xl border border-slate-200 p-4">
-                    <p class="text-md font-bold text-[#19747E] mb-3">Skøyting: <span class="text-[#A9D6E5] italic"> Dobbeldans </span></p>
+                    <p class="text-md font-bold text-[var(--p1)] mb-3">Skøyting: <span class="text-[var(--p2)] italic"> Dobbeldans </span></p>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
                         <div class="rounded-xl overflow-hidden shadow-sm">
                             <div class="aspect-video relative cursor-pointer group" on:click={() => activateVideo("PlFkOEr7bw0")}>
@@ -1202,7 +1231,7 @@
 
                 <!-- Skøyting: Padling -->
                 <div class="bg-white rounded-2xl border border-slate-200 p-4">
-                    <p class="text-md font-bold text-[#19747E] mb-3">Skøyting: <span class="text-[#A9D6E5] italic"> Padling </span></p>
+                    <p class="text-md font-bold text-[var(--p1)] mb-3">Skøyting: <span class="text-[var(--p2)] italic"> Padling </span></p>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
                         <div class="rounded-xl overflow-hidden shadow-sm">
                             <div class="aspect-video relative cursor-pointer group" on:click={() => activateVideo("Z6ynMU7KixA")}>
@@ -1239,7 +1268,7 @@
 
                 <!-- Skøyting: Enkeldans -->
                 <div class="bg-white rounded-2xl border border-slate-200 p-4">
-                    <p class="text-md font-bold text-[#19747E] mb-3">Skøyting: <span class="text-[#A9D6E5] italic"> Enkeldans </span></p>
+                    <p class="text-md font-bold text-[var(--p1)] mb-3">Skøyting: <span class="text-[var(--p2)] italic"> Enkeldans </span></p>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
                         <div class="rounded-xl overflow-hidden shadow-sm">
                             <div class="aspect-video relative cursor-pointer group" on:click={() => activateVideo("8PLC-KWs4c0")}>
@@ -1300,22 +1329,24 @@
                     <X class="h-5 w-5" />
                 </button>
 
-                <p class="font-bold text-lg text-slate-800 mb-4 capitalize">
+                <p class="font-bold text-lg mb-4 capitalize" style="color:var(--p1)">
                     {format(parseISO(selectedSessionGroup.date), "EEEE d. MMMM", { locale: nb })}
                 </p>
 
                 {#each selectedSessionGroup.sessions as s}
-                    {@const info = getWorkoutInfo(s.title)}
-                    <div class="rounded-xl p-3.5 mb-3 {info.bg}">
+                    {@const info = getWorkoutInfo(s.title, darkMode)}
+                    <div class="rounded-xl p-3.5 mb-3 {darkMode ? info.darkBg : info.bg}">
                         <div class="flex items-center gap-3">
                             <div class="w-10 h-10 rounded-xl bg-white flex items-center justify-center flex-shrink-0">
                                 <svelte:component this={info.icon} class="h-5 w-5 {info.color}" />
                             </div>
                             <div>
-                                <p class="font-bold text-slate-800 text-sm leading-tight mb-1">{s.title}</p>
+                                <p class="font-bold text-sm leading-tight mb-1"
+                                    style="color:{darkMode ? 'var(--card)' : '#1E293B'}">{s.title}</p>
                                 <div class="flex items-center gap-2 flex-wrap">
                                     {#if s.durationMin}
-                                        <span class="flex items-center gap-1 font-bold text-sm text-slate-500">
+                                        <span class="flex items-center gap-1 font-bold text-sm"
+                                        style="color:{darkMode ? 'var(--card)' : '#64748B'}">
                                             <Clock class="h-4 w-4" /> {formatTime(s.durationMin)}
                                         </span>
                                     {/if}
@@ -1326,9 +1357,12 @@
                 {/each}
 
                 {#if selectedSessionGroup.sessions[0]?.description}
-                    <div class="bg-slate-50 rounded-xl p-3.5 mt-1 mb-3">
-                        <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5">Kommentar</p>
-                        <p class="text-sm text-slate-700 leading-relaxed">{selectedSessionGroup.sessions[0].description}</p>
+                    <div class="rounded-xl p-3.5 mt-1 mb-3 {darkMode ? '' : 'bg-slate-50'}"
+                        style="{darkMode ? 'background-color:var(--surface)' : ''}">
+                        <p class="text-xs font-bold uppercase tracking-widest mb-1.5"
+                            style="color:{darkMode ? 'var(--p2)' : '#94A3B8'}">Kommentar</p>
+                        <p class="text-sm leading-relaxed"
+                            style="color:{darkMode ? '#CBD5E1' : '#334155'}">{selectedSessionGroup.sessions[0].description}</p>
                     </div>
                 {/if}
 
@@ -1339,7 +1373,7 @@
                     {@const allF = Array.from(new Set([...f1, ...f2]))}
 
                     <div class="mt-3">
-                        <p class="flex items-center gap-2 text-sm font-semibold text-[#19747E] mb-2">
+                        <p class="flex items-center gap-2 text-sm font-semibold text-[var(--p1)] mb-2">
                             <Users class="h-4 w-4" />
                             {allF.length > 0 ? `${allF.length} andre har samme økt` : "Ingen andre har samme økt"}
                         </p>
@@ -1347,7 +1381,7 @@
                             {#if f1.length > 0}
                                 <p class="text-xs font-semibold text-slate-500 mb-1.5">Økt 1:</p>
                                 <div class="flex flex-wrap gap-1.5 mb-3 pb-3 border-b border-slate-100">
-                                    {#each f1 as u}<span class="bg-[#D1E8E2]/50 text-[#19747E] rounded-full px-3 py-1 text-xs font-semibold border border-[#19747E]">{u}</span>{/each}
+                                    {#each f1 as u}<span class="bg-[var(--p3)]/50 text-[var(--p1)] rounded-full px-3 py-1 text-xs font-semibold border border-[var(--p1)]">{u}</span>{/each}
                                 </div>
                             {:else}
                                 <p class="text-xs text-slate-400 italic mb-3 pb-3 border-b border-slate-100">Økt 1: Ingen andre</p>
@@ -1355,14 +1389,14 @@
                             {#if f2.length > 0}
                                 <p class="text-xs font-semibold text-slate-500 mb-1.5">Økt 2:</p>
                                 <div class="flex flex-wrap gap-1.5">
-                                    {#each f2 as u}<span class="bg-[#D1E8E2]/50 text-[#19747E] rounded-full px-3 py-1 text-xs font-semibold border border-[#19747E]">{u}</span>{/each}
+                                    {#each f2 as u}<span class="bg-[var(--p3)]/50 text-[var(--p1)] rounded-full px-3 py-1 text-xs font-semibold border border-[var(--p1)]">{u}</span>{/each}
                                 </div>
                             {:else}
                                 <p class="text-xs text-slate-400 italic">Økt 2: Ingen andre</p>
                             {/if}
                         {:else if f1.length > 0}
                             <div class="flex flex-wrap gap-1.5">
-                                {#each f1 as u}<span class="bg-[#D1E8E2]/50 text-[#19747E] rounded-full px-3 py-1 text-xs font-semibold border border-[#19747E]">{u}</span>{/each}
+                                {#each f1 as u}<span class="bg-[var(--p3)]/50 text-[var(--p1)] rounded-full px-3 py-1 text-xs font-semibold border border-[var(--p1)]">{u}</span>{/each}
                             </div>
                         {:else}
                             <p class="text-xs text-slate-400 italic">Ingen andre er satt opp med denne økten.</p>
@@ -1385,20 +1419,20 @@
                 <!-- X close button – above month navigation -->
                 <div class="flex justify-end mb-2">
                     <button on:click={() => activeModal = null}
-                        class="bg-slate-100 hover:bg-slate-200 rounded-lg p-1.5 text-slate-500 transition-colors">
+                        class="bg-[var(--surface)] hover:bg-[var(--surface)]/50 rounded-lg p-1.5 text-slate-500 transition-colors">
                         <X class="h-5 w-5" />
                     </button>
                 </div>
 
                 <div class="flex items-center justify-between mb-4">
                     <button on:click={() => { calendarModalCursor = subMonths(calendarModalCursor, 1); updateCalendarModalDays(); }}
-                        class="bg-slate-100 hover:bg-[#A9D6E5] rounded-xl p-2 transition-colors">
-                        <ChevronLeft class="h-4 w-4 text-[#19747E]" />
+                        class="bg-[var(--surface)] hover:bg-[var(--surface)]/50 rounded-xl p-2 transition-colors">
+                        <ChevronLeft class="h-4 w-4 text-[var(--p1)]" />
                     </button>
                     <h3 class="font-bold text-slate-800 capitalize">{format(calendarModalCursor, "MMMM yyyy", { locale: nb })}</h3>
                     <button on:click={() => { calendarModalCursor = addMonths(calendarModalCursor, 1); updateCalendarModalDays(); }}
-                        class="bg-slate-100 hover:bg-[#A9D6E5] rounded-xl p-2 transition-colors">
-                        <ChevronRight class="h-4 w-4 text-[#19747E]" />
+                        class="bg-[var(--surface)] hover:bg-[var(--surface)]/50 rounded-xl p-2 transition-colors">
+                        <ChevronRight class="h-4 w-4 text-[var(--p1)]" />
                     </button>
                 </div>
 
@@ -1417,12 +1451,12 @@
                             {@const isDbl = dayW.length >= 2}
                             <button on:click={() => selectCalendarDate(d)}
                                 class="aspect-square rounded-lg text-sm flex flex-col items-center justify-center gap-0.5 transition-colors
-                                    {isSel ? 'bg-[#19747E] text-white font-bold' : isT ? 'bg-[#A9D6E5] text-[#19747E] font-bold' : 'hover:bg-slate-100 text-slate-700'}">
+                                    {isSel ? 'bg-[var(--p1)] text-white font-bold' : isT ? 'bg-[var(--p2)] text-[var(--p1)] font-bold' : 'hover:bg-slate-100 text-slate-700'}">
                                 {format(d, "d")}
                                 {#if hasW}
                                     <div class="flex gap-0.5">
-                                        <span class="w-1 h-1 rounded-full {isSel ? 'bg-white/70' : 'bg-[#19747E]'}"></span>
-                                        {#if isDbl}<span class="w-1 h-1 rounded-full {isSel ? 'bg-white/50' : 'bg-[#19747E]'}"></span>{/if}
+                                        <span class="w-1 h-1 rounded-full {isSel ? 'bg-white/70' : 'bg-[var(--p1)]'}"></span>
+                                        {#if isDbl}<span class="w-1 h-1 rounded-full {isSel ? 'bg-white/50' : 'bg-[var(--p1)]'}"></span>{/if}
                                     </div>
                                 {/if}
                             </button>
@@ -1433,7 +1467,7 @@
                 </div>
 
                 <button on:click={() => selectCalendarDate(today)}
-                    class="w-full mt-4 py-2.5 rounded-xl border border-[#19747E] bg-[#D1E8E2] text-[#19747E] text-sm font-semibold transition-colors">
+                    class="w-full mt-4 py-2.5 rounded-xl border border-[var(--p1)] bg-[var(--p3)] text-[var(--p1)] text-sm font-semibold transition-colors">
                     Gå til i dag
                 </button>
             </div>
@@ -1450,7 +1484,7 @@
                 use:swipeToClose
                 on:click|stopPropagation role="dialog" aria-modal="true">
 
-                <div class="bg-[#19747E] px-5 py-6 flex items-center gap-3">
+                <div class="bg-[var(--p1)] px-5 py-6 flex items-center gap-3">
                     <div class="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
                         <User class="h-4 w-4 text-white" />
                     </div>
@@ -1471,7 +1505,7 @@
                         {#if currentEditPlanSheet}
                             <a href={currentEditPlanSheet} target="_blank" rel="noopener noreferrer"
                                 on:click={() => activeModal = null}
-                                class="flex items-center gap-3 w-full px-3 py-3 rounded-xl hover:bg-slate-50 transition-colors text-left mb-1">
+                                class="flex items-center gap-3 w-full px-3 py-3 rounded-xl hover:bg-[var(--surface)]/50 transition-colors text-left mb-1">
                                 <span class="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center flex-shrink-0">
                                     <SquarePen class="h-6 w-6 text-green-700" />
                                 </span>
@@ -1482,9 +1516,9 @@
                         {/if}
 
                         <button on:click={() => showStyrkeSubmenu = true}
-                            class="flex items-center gap-3 w-full px-3 py-3 rounded-xl hover:bg-slate-50 transition-colors text-left mb-1">
-                            <span class="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
-                                <Dumbbell class="h-6 w-6 text-[#19747E]" />
+                            class="flex items-center gap-3 w-full px-3 py-3 rounded-xl hover:bg-[var(--surface)]/50 transition-colors text-left mb-1">
+                            <span class="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 bg-[var(--surface)]">
+                                <Dumbbell class="h-6 w-6 text-[var(--p1)]" />
                             </span>
                             <span class="text-sm font-medium text-slate-700 flex-1">Styrkeøkter</span>
                             <ChevronRight class="h-6 w-6 text-slate-300" />
@@ -1492,12 +1526,26 @@
 
                         <a href="/pdf/Intensitessoner.pdf" target="_blank" rel="noopener noreferrer"
                             on:click={() => activeModal = null}
-                            class="flex items-center gap-3 w-full px-3 py-3 rounded-xl hover:bg-slate-50 transition-colors text-left mb-1">
-                            <span class="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
-                                <FileText class="h-6 w-6 text-[#19747E]" />
+                            class="flex items-center gap-3 w-full px-3 py-3 rounded-xl hover:bg-[var(--surface)]/50 transition-colors text-left mb-1">
+                            <span class="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 bg-[var(--surface)]">
+                                <FileText class="h-6 w-6 text-[var(--p1)]" />
                             </span>
                             <span class="text-sm font-medium text-slate-700">Intensitetssoner</span>
                         </a>
+
+
+                        <div class="flex items-center gap-3 w-full px-3 py-3 rounded-xl mb-1">
+                            <span class="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
+                                <Moon class="h-6 w-6 text-[var(--p1)]" />
+                            </span>
+                            <span class="text-sm font-medium text-slate-700 flex-1">Mørkt tema</span>
+                            <button on:click|stopPropagation={() => darkMode = !darkMode}
+                                class="relative w-11 h-6 rounded-full transition-colors duration-200 flex-shrink-0"
+                                style="background-color:{darkMode?'var(--p1)':'#CBD5E1'}" aria-label="Bytt tema">
+                                <span class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-200"
+                                    style="transform:translateX({darkMode?'20px':'0px'})"></span>
+                            </button>
+                        </div>
 
                         <div class="h-px bg-slate-100 my-2"></div>
 
@@ -1510,16 +1558,16 @@
                         </button>
                     {:else}
                         <button on:click={() => showStyrkeSubmenu = false}
-                            class="flex items-center gap-2 text-sm font-semibold text-[#19747E] px-3 py-2 mb-2 hover:bg-[#A9D6E5]/50 rounded-lg transition-colors">
+                            class="flex items-center gap-2 text-sm font-semibold text-[var(--p1)] px-3 py-2 mb-2 hover:bg-[var(--p2)]/50 rounded-lg transition-colors">
                             <ArrowLeft class="h-6 w-6" /> Tilbake
                         </button>
                         <p class="text-xs font-bold text-slate-400 uppercase tracking-widest px-3 mb-2">Styrkeøkter</p>
                         {#each styrkeProgrammer as p}
                             <a href={p.url} target="_blank" rel="noopener noreferrer"
                                 on:click={() => activeModal = null}
-                                class="flex items-center gap-3 w-full px-3 py-3 rounded-xl hover:bg-slate-50 transition-colors text-left mb-1">
-                                <span class="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
-                                    <FileText class="h-6 w-6 text-[#19747E]" />
+                                class="flex items-center gap-3 w-full px-3 py-3 rounded-xl hover:bg-[var(--surface)]/50 transition-colors text-left mb-1">
+                                <span class="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 bg-[var(--surface)]">
+                                    <FileText class="h-6 w-6 text-[var(--p1)]" />
                                 </span>
                                 <span class="text-sm font-medium text-slate-700">{p.title}</span>
                             </a>
@@ -1534,5 +1582,5 @@
 {/if}
 
 {#if isLoading && loggedIn}
-    <div class="fixed top-0 inset-x-0 h-0.5 z-[999] bg-gradient-to-r from-[#19747E] via-[#19747E]/20 to-[#19747E] animate-pulse"></div>
+    <div class="fixed top-0 inset-x-0 h-0.5 z-[999] animate-pulse" style="background:linear-gradient(to right,var(--p1),color-mix(in srgb,var(--p1) 20%,transparent),var(--p1))"></div>
 {/if}
