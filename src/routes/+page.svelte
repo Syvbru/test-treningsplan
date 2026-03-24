@@ -715,24 +715,24 @@
 </style>
 
 {#if !loggedIn}
-<div class="fixed inset-0 flex items-center justify-center p-4" style="background:linear-gradient(135deg,#19747E,rgba(25,116,126,.8),rgba(25,116,126,.6))">
+<div class="fixed inset-0 flex items-center justify-center bg-gradient-to-br from-[#19747E] via-[#19747E]/80 to-[#19747E]/60 p-4">
     <div class="w-full max-w-sm bg-white rounded-3xl p-8 shadow-2xl">
         <h2 class="text-center font-bold text-3xl mb-1">
-            <span class="text-[var(--p2)] italic">TRENINGS</span><span class="text-[var(--p1)] italic">PLAN</span>
+            <span class="text-[#A9D6E5] italic">TRENINGS</span><span class="text-[#19747E] italic">PLAN</span>
         </h2>
         <p class="text-center text-slate-400 text-sm mb-8">Logg inn for å se din treningsplan</p>
 
         <div class="mb-4">
             <label for="username" class="block text-xs font-semibold text-slate-500 uppercase tracking-widest mb-1.5">Brukernavn</label>
             <input id="username" type="text" bind:value={username} disabled={isLoading}
-                class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-base focus:border-[var(--p1)]/60 focus:ring-2 focus:ring-[color:var(--p1)] outline-none transition disabled:opacity-60"
+                class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-base focus:border-[#19747E]/60 focus:ring-2 focus:ring-[#19747E] outline-none transition disabled:opacity-60"
                 placeholder="Ditt brukernavn" autocomplete="username" />
         </div>
         <div class="mb-6">
             <label for="password" class="block text-xs font-semibold text-slate-500 uppercase tracking-widest mb-1.5">Passord</label>
             <input id="password" type="password" bind:value={password} disabled={isLoading}
                 on:keydown={(e) => { if (e.key === "Enter") handleLogin(); }}
-                class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-base focus:border-[var(--p1)]/60 focus:ring-2 focus:ring-[color:var(--p1)] outline-none transition disabled:opacity-60"
+                class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-base focus:border-[#19747E]/60 focus:ring-2 focus:ring-[#19747E] outline-none transition disabled:opacity-60"
                 placeholder="••••••••" autocomplete="current-password" />
         </div>
 
@@ -741,7 +741,7 @@
         {/if}
 
         <button on:click={handleLogin} disabled={isLoading || !username || !password}
-            class="w-full flex items-center justify-center gap-2 rounded-xl bg-[var(--p1)] text-white py-3 text-base font-bold tracking-wide transition disabled:opacity-40 disabled:cursor-not-allowed">
+            class="w-full flex items-center justify-center gap-2 rounded-xl bg-[#19747E] text-white py-3 text-base font-bold tracking-wide transition disabled:opacity-40 disabled:cursor-not-allowed">
             {#if isLoading}
                 <svg class="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
