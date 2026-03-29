@@ -1,11 +1,12 @@
 import { json } from '@sveltejs/kit';
+import { JWT_SECRET, POSTGRES_URL } from '$env/static/private';
 import jwt from 'jsonwebtoken';
 import { neon } from '@neondatabase/serverless';
 
-const JWT_SECRET = process.env.JWT_SECRET;
+
 
 function getDb() {
-    return neon(process.env.POSTGRES_URL);
+    return neon(POSTGRES_URL); 
 }
 
 function getUserHash(cookies) {
