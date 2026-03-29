@@ -46,12 +46,12 @@ export async function POST({ request, cookies }) {
         }
         
         // Lagre sist søkte utøver i cookie
-        cookies.set('last_search_name', searchName, {
+        cookies.set('last_search_hash', nameHash, {
             path: '/',
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'strict',
-            maxAge: 60 * 60 * 24 * 365 // 1 år
+            maxAge: 60 * 60 * 24 * 365
         });
         
         return json({ 
