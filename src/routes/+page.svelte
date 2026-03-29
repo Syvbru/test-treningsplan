@@ -11,7 +11,7 @@
         Calendar, Clock, Zap, Dumbbell, BookOpen, Timer, Heart,
         BatteryCharging, User, Lock, ChevronDown, ChevronUp, Users,
         ChevronLeft, ChevronRight, X, LogOut, ArrowLeft, SquarePen,
-        FileText, Video, NotepadText, LineChart, MessageSquare, Moon
+        FileText, Video, NotepadText, LineChart, MessageSquare, Moon, Plus, Trash2
     } from "lucide-svelte";
 
     let username = "";
@@ -203,7 +203,7 @@
                             await searchUtoverByName();
                         }
                     } else {
-                        await Promise.all([loadWorkoutPlan(data.sheetUrl), loadFellesOkter()]);
+                        await Promise.all([loadWorkoutPlan(data.sheetUrl), loadFellesOkter(), hentTeknikk()]);
                         await tick(); scrollToAnchor();
                     }
                 }
@@ -247,7 +247,7 @@
             if (data.success) {
                 currentUtoverNavn = data.searchName;
                 currentEditPlanSheet = data.editPlanSheet || "";
-                await Promise.all([loadWorkoutPlan(data.sheetUrl), loadFellesOkter()]);
+                await Promise.all([loadWorkoutPlan(data.sheetUrl), loadFellesOkter(), hentTeknikk()]);
                 selectedDate = null; selectedSessionGroup = null;
                 cardAnchor = startOfDay(new Date()); cardBackDays = 7; cardForwardDays = 7;
                 await tick(); scrollToAnchor();
@@ -690,6 +690,108 @@
         activeVideos = new Set([...activeVideos, id]);
     }
     // ── SLUTT: YOUTUBE FACADE ────────────────────────────────────────────────────
+
+    // ── TEKNIKKLOGG ──────────────────────────────────────────────────────────────
+    type TeknikkLogg = {
+        id: number;
+        dato: string;
+        stilart: string;
+        tilbakemelding: string;
+        video_url: string | null;
+    };
+    
+    let teknikkLogger: TeknikkLogg[] = [];
+    let teknikkDato = '';
+    let teknikkStilart = '';
+    let teknikkTilbakemelding = '';
+    let teknikkVideoFil: File | null = null;
+    let teknikkLaster = false;
+    let teknikkFeil = '';
+    let visTeknikkSkjema = false;
+    let uploadProgress = 0;
+    
+    async function hentTeknikk() {
+        try {
+            const res = await fetch('/api/teknikk');
+            if (res.ok) teknikkLogger = await res.json();
+        } catch {}
+    }
+    
+    function uploadTilCloudinary(fil: File): Promise<string> {
+        return new Promise((resolve, reject) => {
+            const fd = new FormData();
+            fd.append('file', fil);
+            fd.append('upload_preset', PUBLIC_CLOUDINARY_UPLOAD_PRESET);
+    
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', `https://api.cloudinary.com/v1_1/${PUBLIC_CLOUDINARY_CLOUD_NAME}/video/upload`);
+    
+            xhr.upload.onprogress = (e) => {
+                if (e.lengthComputable) uploadProgress = Math.round((e.loaded / e.total) * 100);
+            };
+    
+            xhr.onload = () => {
+                if (xhr.status === 200) {
+                    resolve(JSON.parse(xhr.responseText).secure_url);
+                } else {
+                    reject(new Error('Cloudinary feil'));
+                }
+            };
+    
+            xhr.onerror = () => reject(new Error('Nettverksfeil'));
+            xhr.send(fd);
+        });
+    }
+    
+    async function lagreTeknikklogg() {
+        if (!teknikkDato || !teknikkStilart) return;
+        teknikkLaster = true;
+        teknikkFeil = '';
+        uploadProgress = 0;
+    
+        try {
+            let video_url = '';
+    
+            if (teknikkVideoFil) {
+                video_url = await uploadTilCloudinary(teknikkVideoFil);
+            }
+    
+            const res = await fetch('/api/teknikk', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ dato: teknikkDato, stilart: teknikkStilart, tilbakemelding: teknikkTilbakemelding, video_url })
+            });
+    
+            if (res.ok) {
+                teknikkDato = '';
+                teknikkStilart = '';
+                teknikkTilbakemelding = '';
+                teknikkVideoFil = null;
+                visTeknikkSkjema = false;
+                await hentTeknikk();
+            } else {
+                teknikkFeil = 'Kunne ikke lagre. Prøv igjen.';
+            }
+        } catch {
+            teknikkFeil = 'Noe gikk galt. Prøv igjen.';
+        } finally {
+            teknikkLaster = false;
+            uploadProgress = 0;
+        }
+    }
+    
+    async function slettTeknikklogg(id: number) {
+        if (!confirm('Slett denne loggen?')) return;
+        try {
+            await fetch('/api/teknikk', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id })
+            });
+            await hentTeknikk();
+        } catch {}
+    }
+
 </script>
 
 <style>
@@ -1087,6 +1189,131 @@
                         <span class="text-md font-bold text-[var(--p1)]">{barStats.totalHours}t{barStats.totalMins > 0 ? ` ${barStats.totalMins}min` : ""}</span>
                     </div>
                 </div>
+            </div>
+        </section>
+
+        <!-- TEKNIKKLOGG -->
+        <section>
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="text-base font-bold text-[var(--p1)]">Teknikklogg:</h2>
+                <button on:click={() => { visTeknikkSkjema = !visTeknikkSkjema; teknikkFeil = ''; }}
+                    class="flex items-center gap-1.5 bg-[var(--p1)] text-white rounded-full px-3 py-1.5 text-xs font-bold hover:bg-[var(--p1)]/80 transition-colors">
+                    <Plus class="h-3.5 w-3.5" />
+                    Ny logg
+                </button>
+            </div>
+        
+            {#if visTeknikkSkjema}
+                <div class="bg-white rounded-2xl border border-slate-200 p-4 mb-4">
+                    <h3 class="font-bold text-sm text-[var(--p1)] mb-3">Logg ny teknikkøkt</h3>
+        
+                    <div class="flex flex-col gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-widest mb-1">Dato</label>
+                            <input type="date" bind:value={teknikkDato}
+                                class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-[var(--p1)] focus:ring-2 focus:ring-[var(--p1)]/20 transition" />
+                        </div>
+        
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-widest mb-1">Stilart</label>
+                            <select bind:value={teknikkStilart}
+                                class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-[var(--p1)] transition">
+                                <option value="">Velg stilart…</option>
+                                <option>Diagonal</option>
+                                <option>Staking</option>
+                                <option>Dobbeltak med fraspark</option>
+                                <option>Dobbeldans</option>
+                                <option>Padling</option>
+                                <option>Enkeldans</option>
+                            </select>
+                        </div>
+        
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-widest mb-1">Tilbakemelding / hva øvde du på</label>
+                            <textarea bind:value={teknikkTilbakemelding} rows="3"
+                                placeholder="F.eks. fokus på armtrekket, tilbakemelding fra trener…"
+                                class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-[var(--p1)] transition resize-none" />
+                        </div>
+        
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-widest mb-1">Video (valgfritt)</label>
+                            <label class="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-200 p-4 cursor-pointer hover:border-[var(--p1)] transition-colors">
+                                <input type="file" accept="video/*" class="hidden"
+                                    on:change={(e) => teknikkVideoFil = e.currentTarget.files?.[0] ?? null} />
+                                {#if teknikkVideoFil}
+                                    <Video class="h-5 w-5 text-[var(--p1)] mb-1" />
+                                    <p class="text-sm text-[var(--p1)] font-semibold truncate max-w-full">{teknikkVideoFil.name}</p>
+                                    <p class="text-xs text-slate-400">{(teknikkVideoFil.size / 1024 / 1024).toFixed(1)} MB</p>
+                                {:else}
+                                    <Video class="h-5 w-5 text-slate-300 mb-1" />
+                                    <p class="text-sm text-slate-400">Trykk for å velge video</p>
+                                {/if}
+                            </label>
+                        </div>
+        
+                        {#if teknikkLaster && uploadProgress > 0}
+                            <div>
+                                <div class="rounded-full overflow-hidden bg-slate-100 h-2">
+                                    <div class="h-2 bg-[var(--p1)] transition-all duration-200 rounded-full" style="width:{uploadProgress}%"></div>
+                                </div>
+                                <p class="text-xs text-center text-slate-400 mt-1">Laster opp video… {uploadProgress}%</p>
+                            </div>
+                        {/if}
+        
+                        {#if teknikkFeil}
+                            <p class="text-sm text-red-600 bg-red-50 rounded-xl px-3 py-2">{teknikkFeil}</p>
+                        {/if}
+        
+                        <div class="flex gap-2 pt-1">
+                            <button on:click={() => { visTeknikkSkjema = false; teknikkFeil = ''; }}
+                                class="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-500 hover:bg-slate-50 transition-colors">
+                                Avbryt
+                            </button>
+                            <button on:click={lagreTeknikklogg}
+                                disabled={teknikkLaster || !teknikkDato || !teknikkStilart}
+                                class="flex-1 rounded-xl bg-[var(--p1)] text-white py-2.5 text-sm font-bold disabled:opacity-40 transition-colors">
+                                {teknikkLaster ? (uploadProgress > 0 ? `${uploadProgress}%` : 'Lagrer…') : 'Lagre'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            {/if}
+        
+            <div class="flex flex-col gap-3">
+                {#if teknikkLogger.length === 0}
+                    <div class="bg-white rounded-2xl border border-slate-200 p-6 text-center">
+                        <Video class="h-8 w-8 text-slate-300 mx-auto mb-2" />
+                        <p class="text-sm text-slate-400">Ingen teknikkøkter logget ennå.</p>
+                    </div>
+                {:else}
+                    {#each teknikkLogger as logg}
+                        <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+                            <div class="p-4">
+                                <div class="flex items-start justify-between gap-2">
+                                    <div>
+                                        <p class="font-bold text-[var(--p1)]">{logg.stilart}</p>
+                                        <p class="text-xs text-slate-400 mb-2">
+                                            {format(parseISO(logg.dato), 'd. MMMM yyyy', { locale: nb })}
+                                        </p>
+                                        {#if logg.tilbakemelding}
+                                            <p class="text-sm text-slate-600 leading-relaxed">{logg.tilbakemelding}</p>
+                                        {/if}
+                                    </div>
+                                    <button on:click={() => slettTeknikklogg(logg.id)}
+                                        class="p-1.5 rounded-lg hover:bg-red-50 text-slate-300 hover:text-red-500 transition-colors flex-shrink-0">
+                                        <Trash2 class="h-4 w-4" />
+                                    </button>
+                                </div>
+                            </div>
+                            {#if logg.video_url}
+                                <video src={logg.video_url} controls preload="none"
+                                    class="w-full border-t border-slate-100 bg-black"
+                                    style="max-height:320px; object-fit:contain">
+                                </video>
+                            {/if}
+                        </div>
+                    {/each}
+                {/if}
             </div>
         </section>
 
