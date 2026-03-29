@@ -1246,55 +1246,56 @@
               <div class="bg-white rounded-2xl border border-slate-200 p-4 mb-4">
                 <h3 class="font-bold text-sm text-[var(--p1)] mb-3">Logg ny teknikkøkt</h3>
             
-                <div
-                  class="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory"
-                  style="scrollbar-width:none; -webkit-overflow-scrolling:touch;"
-                >
-                  {#if teknikkLogger.length === 0}
-                    <div class="bg-white rounded-2xl border border-slate-200 p-6 text-center w-full">
-                      <Video class="h-8 w-8 text-slate-300 mx-auto mb-2" />
-                      <p class="text-sm text-slate-400">Ingen teknikkøkter logget ennå.</p>
-                    </div>
-                  {:else}
-                    {#each teknikkLogger as logg}
-                      <button
-                        class="flex-shrink-0 snap-start w-36 rounded-2xl p-3 text-left bg-white border border-slate-200 hover:border-[var(--p1)] flex flex-col transition-all duration-150"
-                        on:click={() => {
-                          selectedTeknikkLogg = logg;
-                          activeModal = 'teknikk';
-                        }}
-                      >
-                        <div class="flex items-center justify-between w-full mb-2">
-                          <span class="text-xs font-semibold text-[var(--p2)]">
-                            {format(parseISO(logg.dato), 'EEE', { locale: nb })}
-                          </span>
-                          <span class="text-xs font-bold text-[var(--p2)]">
-                            {format(parseISO(logg.dato), 'dd.MM')}
-                          </span>
+                <!-- TEKNIKKLOGG KORT -->
+                <div class="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory"
+                    style="scrollbar-width:none; -webkit-overflow-scrolling:touch;">
+                    {#if teknikkLogger.length === 0}
+                        <div class="bg-white rounded-2xl border border-slate-200 p-6 text-center w-full">
+                            <Video class="h-8 w-8 text-slate-300 mx-auto mb-2" />
+                            <p class="text-sm text-slate-400">Ingen teknikkøkter logget ennå.</p>
                         </div>
-            
-                        <p class="text-sm font-bold italic uppercase leading-tight text-[var(--p2)] mb-2">
-                          Teknikk {logg.stilart}
-                        </p>
-            
-                        <BookOpen class="h-6 w-6 text-[var(--p2)] mb-2" />
-            
-                        <p class="text-xs text-[var(--p2)] flex-1 leading-snug">
-                          {format(parseISO(logg.dato), 'd. MMM yyyy', { locale: nb })}
-                        </p>
-            
-                        <div class="flex items-center gap-2 w-full pt-1.5 mt-3 border-t border-slate-100 text-[var(--p2)]">
-                          {#if logg.tilbakemelding}
-                            <MessageSquare class="h-3.5 w-3.5" />
-                          {/if}
-                          {#if logg.video_url}
-                            <Video class="h-3.5 w-3.5" />
-                          {/if}
-                        </div>
-                      </button>
-                    {/each}
-                  {/if}
-                </div>
+                    {:else}
+                        {#each teknikkLogger as logg}
+                            <button
+                                class="flex-shrink-0 snap-start w-36 rounded-2xl p-3 text-left bg-white border border-slate-200 hover:border-[var(--p1)] flex flex-col transition-all duration-150"
+                                on:click={() => { selectedTeknikkLogg = logg; activeModal = "teknikk"; }}>
+                
+                                <!-- Dato-rad -->
+                                <div class="flex items-center justify-between w-full mb-2">
+                                    <span class="text-xs font-semibold text-[var(--p2)]">
+                                        {format(parseISO(logg.dato), 'EEE', { locale: nb })}
+                                    </span>
+                                    <span class="text-xs font-bold text-[var(--p2)]">
+                                        {format(parseISO(logg.dato), 'dd.MM')}
+                                    </span>
+                                </div>
+                
+                                <!-- Overskrift -->
+                                <p class="text-sm font-bold italic uppercase leading-tight text-[var(--p2)] mb-2">
+                                    Teknikk {logg.stilart}
+                                </p>
+                
+                                <!-- Ikon -->
+                                <BookOpen class="h-6 w-6 text-[var(--p2)] mb-2" />
+                
+                                <!-- Dato lang -->
+                                <p class="text-xs text-[var(--p2)] flex-1 leading-snug">
+                                    {format(parseISO(logg.dato), 'd. MMM yyyy', { locale: nb })}
+                                </p>
+                
+                                <!-- Bunn: kommentar- og videoikon -->
+                                <div class="flex items-center gap-2 w-full pt-1.5 mt-3 border-t border-slate-100 text-[var(--p2)]">
+                                    {#if logg.tilbakemelding}
+                                        <MessageSquare class="h-3.5 w-3.5" />
+                                    {/if}
+                                    {#if logg.video_url}
+                                        <Video class="h-3.5 w-3.5" />
+                                    {/if}
+                                </div>
+                            </button>
+                        {/each}
+                    {/if}
+                </div>    
               </div>
             {/if}
         
