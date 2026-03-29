@@ -53,6 +53,27 @@ export async function POST({ request, cookies }) {
     }
 }
 
+export async function PUT({ request, cookies }) {
+    try {
+        const userKeyHash = getUserHash(cookies);
+        const { id, dato, stilart, tilbakemelding } = await request.json();
+
+        if (!id || !dato || !stilart) {
+            return json({ error: 'Dato og stilart er påkrevd' }, { status: 400 });
+        }
+
+        const sql = getDb();
+        await sql`
+            UPDATE teknikk_logger
+            SET dato = ${dato}, stilart = ${stilart}, tilbakemelding = ${tilbakemelding || ''}
+            WHERE id = ${id} AND user_key_hash = ${userKeyHash}
+        `;
+        return json({ success: true });
+    } catch {
+        return json({ error: 'Kunne ikke oppdatere' }, { status: 500 });
+    }
+}
+
 export async function DELETE({ request, cookies }) {
     try {
         const userKeyHash = getUserHash(cookies);
