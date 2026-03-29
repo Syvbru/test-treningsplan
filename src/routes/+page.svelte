@@ -795,6 +795,41 @@
         } catch {}
     }
 
+    let redigerLogg: TeknikkLogg | null = null;
+    let redigerDato = '';
+    let redigerStilart = '';
+    let redigerTilbakemelding = '';
+    let redigerLaster = false;
+    
+    function startRediger(logg: TeknikkLogg) {
+        redigerLogg = logg;
+        redigerDato = logg.dato;
+        redigerStilart = logg.stilart;
+        redigerTilbakemelding = logg.tilbakemelding;
+    }
+    
+    async function lagreRediger() {
+        if (!redigerLogg || !redigerDato || !redigerStilart) return;
+        redigerLaster = true;
+        try {
+            const res = await fetch('/api/teknikk', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: redigerLogg.id,
+                    dato: redigerDato,
+                    stilart: redigerStilart,
+                    tilbakemelding: redigerTilbakemelding
+                })
+            });
+            if (res.ok) {
+                redigerLogg = null;
+                await hentTeknikk();
+            }
+        } catch {}
+        finally { redigerLaster = false; }
+    }
+
 </script>
 
 <style>
@@ -1291,24 +1326,76 @@
                 {:else}
                     {#each teknikkLogger as logg}
                         <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-                            <div class="p-4">
-                                <div class="flex items-start justify-between gap-2">
+                            {#if redigerLogg?.id === logg.id}
+                                <!-- REDIGERINGSMODUS -->
+                                <div class="p-4 flex flex-col gap-3">
+                                    <p class="font-bold text-sm text-[var(--p1)]">Rediger logg</p>
+                    
                                     <div>
-                                        <p class="font-bold text-[var(--p1)]">{logg.stilart}</p>
-                                        <p class="text-xs text-slate-400 mb-2">
-                                            {format(parseISO(logg.dato), 'd. MMMM yyyy', { locale: nb })}
-                                        </p>
-                                        {#if logg.tilbakemelding}
-                                            <p class="text-sm text-slate-600 leading-relaxed">{logg.tilbakemelding}</p>
-                                        {/if}
+                                        <label class="block text-xs font-semibold text-slate-500 uppercase tracking-widest mb-1">Dato</label>
+                                        <input type="date" bind:value={redigerDato}
+                                            class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-[var(--p1)] transition" />
                                     </div>
-                                    <button on:click={() => slettTeknikklogg(logg.id)}
-                                        class="p-1.5 rounded-lg hover:bg-red-50 text-slate-300 hover:text-red-500 transition-colors flex-shrink-0">
-                                        <Trash2 class="h-4 w-4" />
-                                    </button>
+                    
+                                    <div>
+                                        <label class="block text-xs font-semibold text-slate-500 uppercase tracking-widest mb-1">Stilart</label>
+                                        <select bind:value={redigerStilart}
+                                            class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-[var(--p1)] transition">
+                                            <option>Diagonal</option>
+                                            <option>Staking</option>
+                                            <option>Dobbeltak med fraspark</option>
+                                            <option>Dobbeldans</option>
+                                            <option>Padling</option>
+                                            <option>Enkeldans</option>
+                                        </select>
+                                    </div>
+                    
+                                    <div>
+                                        <label class="block text-xs font-semibold text-slate-500 uppercase tracking-widest mb-1">Tilbakemelding</label>
+                                        <textarea bind:value={redigerTilbakemelding} rows="3"
+                                            class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-[var(--p1)] transition resize-none" />
+                                    </div>
+                    
+                                    <div class="flex gap-2">
+                                        <button on:click={() => redigerLogg = null}
+                                            class="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-500 hover:bg-slate-50 transition-colors">
+                                            Avbryt
+                                        </button>
+                                        <button on:click={lagreRediger}
+                                            disabled={redigerLaster || !redigerDato || !redigerStilart}
+                                            class="flex-1 rounded-xl bg-[var(--p1)] text-white py-2.5 text-sm font-bold disabled:opacity-40 transition-colors">
+                                            {redigerLaster ? 'Lagrer…' : 'Lagre'}
+                                        </button>
+                                    </div>
                                 </div>
-                            </div>
-                            {#if logg.video_url}
+                            {:else}
+                                <!-- VISNINGMODUS -->
+                                <div class="p-4">
+                                    <div class="flex items-start justify-between gap-2">
+                                        <div class="flex-1 min-w-0">
+                                            <p class="font-bold text-[var(--p1)]">{logg.stilart}</p>
+                                            <p class="text-xs text-slate-400 mb-2">
+                                                {format(parseISO(logg.dato), 'd. MMMM yyyy', { locale: nb })}
+                                            </p>
+                                            {#if logg.tilbakemelding}
+                                                <p class="text-sm text-slate-600 leading-relaxed">{logg.tilbakemelding}</p>
+                                            {/if}
+                                        </div>
+                                        <div class="flex gap-1 flex-shrink-0">
+                                            <button on:click={() => startRediger(logg)}
+                                                class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-300 hover:text-[var(--p1)] transition-colors">
+                                                <SquarePen class="h-4 w-4" />
+                                            </button>
+                                            <button on:click={() => slettTeknikklogg(logg.id)}
+                                                class="p-1.5 rounded-lg hover:bg-red-50 text-slate-300 hover:text-red-500 transition-colors">
+                                                <Trash2 class="h-4 w-4" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            {/if}
+                    
+                            {#if logg.video_url && redigerLogg?.id !== logg.id}
                                 <video src={logg.video_url} controls preload="none"
                                     class="w-full border-t border-slate-100 bg-black"
                                     style="max-height:320px; object-fit:contain">
