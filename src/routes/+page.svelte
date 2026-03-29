@@ -24,9 +24,10 @@
     let currentUtoverNavn = "";
     let currentEditPlanSheet = "";
 
-    type ModalType = "session" | "calendar" | "profile" | null;
+    type ModalType = "session" | "calendar" | "profile" | "teknikk" | null;
     let activeModal: ModalType = null;
     let selectedSessionGroup: { date: string; sessions: Workout[] } | null = null;
+    let selectedTeknikkLogg: TeknikkLogg | null = null;
     let showStyrkeSubmenu = false;
     let expandedDates = new Set<string>();
     let statPeriod: "uke" | "maaned" | "sesong" = "uke";
@@ -1257,12 +1258,8 @@
                             <select bind:value={teknikkStilart}
                                 class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-[var(--p1)] transition">
                                 <option value="">Velg stilart…</option>
-                                <option>Diagonal</option>
-                                <option>Staking</option>
-                                <option>Dobbeltak med fraspark</option>
-                                <option>Dobbeldans</option>
-                                <option>Padling</option>
-                                <option>Enkeldans</option>
+                                <option>Klassisk</option>
+                                <option>Skate</option>
                             </select>
                         </div>
         
@@ -1325,83 +1322,40 @@
                     </div>
                 {:else}
                     {#each teknikkLogger as logg}
-                        <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-                            {#if redigerLogg?.id === logg.id}
-                                <!-- REDIGERINGSMODUS -->
-                                <div class="p-4 flex flex-col gap-3">
-                                    <p class="font-bold text-sm text-[var(--p1)]">Rediger logg</p>
+                        <button
+                            class="w-full rounded-2xl p-3 text-left bg-white border border-slate-200 hover:border-[var(--p1)] transition-all duration-150 flex flex-col"
+                            on:click={() => { selectedTeknikkLogg = logg; activeModal = 'teknikk'; }}>
                     
-                                    <div>
-                                        <label class="block text-xs font-semibold text-slate-500 uppercase tracking-widest mb-1">Dato</label>
-                                        <input type="date" bind:value={redigerDato}
-                                            class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-[var(--p1)] transition" />
-                                    </div>
+                            <!-- Dato-rad -->
+                            <div class="flex items-center justify-between w-full mb-2">
+                                <span class="text-xs font-semibold text-[var(--p2)]">Teknikk</span>
+                                <span class="text-xs font-bold text-[var(--p2)]">
+                                    {format(parseISO(logg.dato), 'd. MMM yyyy', { locale: nb })}
+                                </span>
+                            </div>
                     
-                                    <div>
-                                        <label class="block text-xs font-semibold text-slate-500 uppercase tracking-widest mb-1">Stilart</label>
-                                        <select bind:value={redigerStilart}
-                                            class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-[var(--p1)] transition">
-                                            <option>Diagonal</option>
-                                            <option>Staking</option>
-                                            <option>Dobbeltak med fraspark</option>
-                                            <option>Dobbeldans</option>
-                                            <option>Padling</option>
-                                            <option>Enkeldans</option>
-                                        </select>
-                                    </div>
+                            <!-- Stilart som tittel -->
+                            <p class="text-sm font-bold italic uppercase leading-tight text-[var(--p2)] mb-2">
+                                {logg.stilart}
+                            </p>
                     
-                                    <div>
-                                        <label class="block text-xs font-semibold text-slate-500 uppercase tracking-widest mb-1">Tilbakemelding</label>
-                                        <textarea bind:value={redigerTilbakemelding} rows="3"
-                                            class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-[var(--p1)] transition resize-none" />
-                                    </div>
+                            <!-- Ikon -->
+                            <div class="flex gap-1.5 mb-2">
+                                <BookOpen class="h-5 w-5 text-[var(--p2)]" />
+                            </div>
                     
-                                    <div class="flex gap-2">
-                                        <button on:click={() => redigerLogg = null}
-                                            class="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-500 hover:bg-slate-50 transition-colors">
-                                            Avbryt
-                                        </button>
-                                        <button on:click={lagreRediger}
-                                            disabled={redigerLaster || !redigerDato || !redigerStilart}
-                                            class="flex-1 rounded-xl bg-[var(--p1)] text-white py-2.5 text-sm font-bold disabled:opacity-40 transition-colors">
-                                            {redigerLaster ? 'Lagrer…' : 'Lagre'}
-                                        </button>
-                                    </div>
-                                </div>
-                            {:else}
-                                <!-- VISNINGMODUS -->
-                                <div class="p-4">
-                                    <div class="flex items-start justify-between gap-2">
-                                        <div class="flex-1 min-w-0">
-                                            <p class="font-bold text-[var(--p1)]">{logg.stilart}</p>
-                                            <p class="text-xs text-slate-400 mb-2">
-                                                {format(parseISO(logg.dato), 'd. MMMM yyyy', { locale: nb })}
-                                            </p>
-                                            {#if logg.tilbakemelding}
-                                                <p class="text-sm text-slate-600 leading-relaxed">{logg.tilbakemelding}</p>
-                                            {/if}
-                                        </div>
-                                        <div class="flex gap-1 flex-shrink-0">
-                                            <button on:click={() => startRediger(logg)}
-                                                class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-300 hover:text-[var(--p1)] transition-colors">
-                                                <SquarePen class="h-4 w-4" />
-                                            </button>
-                                            <button on:click={() => slettTeknikklogg(logg.id)}
-                                                class="p-1.5 rounded-lg hover:bg-red-50 text-slate-300 hover:text-red-500 transition-colors">
-                                                <Trash2 class="h-4 w-4" />
-                                            </button>
-                                        </div>
-                                    </div>
+                            <!-- Footer med kommentar/video-indikatorer -->
+                            {#if logg.tilbakemelding || logg.video_url}
+                                <div class="flex items-center gap-2 pt-1.5 mt-1 border-t border-slate-100 text-[var(--p2)]">
+                                    {#if logg.tilbakemelding}
+                                        <MessageSquare class="h-3.5 w-3.5" />
+                                    {/if}
+                                    {#if logg.video_url}
+                                        <Video class="h-3.5 w-3.5" />
+                                    {/if}
                                 </div>
                             {/if}
-                    
-                            {#if logg.video_url && redigerLogg?.id !== logg.id}
-                                <video src={logg.video_url} controls preload="none"
-                                    class="w-full border-t border-slate-100 bg-black"
-                                    style="max-height:320px; object-fit:contain">
-                                </video>
-                            {/if}
-                        </div>
+                        </button>
                     {/each}
                 {/if}
             </div>
@@ -1720,6 +1674,121 @@
                         {/if}
                     </div>
                 {/if}
+                </div>
+            </div>
+        </div>
+    {/if}
+
+    <!-- TEKNIKK DETAIL MODAL -->
+    {#if activeModal === "teknikk" && selectedTeknikkLogg}
+        <div class="fixed inset-0 z-50 flex items-end lg:items-center justify-center bg-slate-900/40 backdrop-blur-sm"
+            on:click={() => { activeModal = null; redigerLogg = null; }} role="button" tabindex="0"
+            on:keydown={(e) => e.key === "Escape" && (activeModal = null)} aria-label="Lukk">
+            <div class="bg-white w-full lg:max-w-2xl lg:mx-auto lg:rounded-3xl rounded-t-3xl max-h-[88vh] min-h-[50vh] lg:min-h-0 overflow-y-auto lg:my-8"
+                use:swipeToDismiss
+                on:click|stopPropagation role="dialog" aria-modal="true">
+                <div class="max-w-lg mx-auto lg:max-w-none p-5 pb-8 relative">
+    
+                    <!-- Drag handle (mobil) -->
+                    <div class="lg:hidden flex justify-center mb-5 -mt-1">
+                        <div class="w-24 h-[5px] rounded-full bg-slate-300"></div>
+                    </div>
+    
+                    <button on:click={() => { activeModal = null; redigerLogg = null; }}
+                        class="hidden lg:flex absolute top-4 right-4 bg-slate-100 hover:bg-slate-200 rounded-lg p-1.5 text-slate-500 transition-colors">
+                        <X class="h-5 w-5" />
+                    </button>
+    
+                    {#if redigerLogg?.id === selectedTeknikkLogg.id}
+                        <!-- REDIGERINGSMODUS -->
+                        <p class="font-bold text-lg text-[var(--p1)] mb-4">Rediger logg</p>
+                        <div class="flex flex-col gap-3">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-widest mb-1">Dato</label>
+                                <input type="date" bind:value={redigerDato}
+                                    class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-[var(--p1)] transition" />
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-widest mb-1">Stilart</label>
+                                <select bind:value={redigerStilart}
+                                    class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-[var(--p1)] transition">
+                                    <option value="">Velg stilart…</option>
+                                    <option>Klassisk</option>
+                                    <option>Skate</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-widest mb-1">Tilbakemelding</label>
+                                <textarea bind:value={redigerTilbakemelding} rows="3"
+                                    class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-[var(--p1)] transition resize-none" />
+                            </div>
+                            <div class="flex gap-2">
+                                <button on:click={() => redigerLogg = null}
+                                    class="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-500 hover:bg-slate-50 transition-colors">
+                                    Avbryt
+                                </button>
+                                <button on:click={async () => { await lagreRediger(); selectedTeknikkLogg = teknikkLogger.find(l => l.id === redigerLogg?.id) ?? null; }}
+                                    disabled={redigerLaster || !redigerDato || !redigerStilart}
+                                    class="flex-1 rounded-xl bg-[var(--p1)] text-white py-2.5 text-sm font-bold disabled:opacity-40 transition-colors">
+                                    {redigerLaster ? 'Lagrer…' : 'Lagre'}
+                                </button>
+                            </div>
+                        </div>
+    
+                    {:else}
+                        <!-- VISNINGMODUS -->
+                        <div class="flex items-start justify-between gap-2 mb-4">
+                            <div>
+                                <p class="font-bold text-lg leading-tight" style="color:var(--p1)">
+                                    Teknikk – {selectedTeknikkLogg.stilart}
+                                </p>
+                                <p class="text-sm text-slate-400 mt-0.5">
+                                    {format(parseISO(selectedTeknikkLogg.dato), 'd. MMMM yyyy', { locale: nb })}
+                                </p>
+                            </div>
+                            <div class="flex gap-1 flex-shrink-0">
+                                <button on:click={() => startRediger(selectedTeknikkLogg)}
+                                    class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-300 hover:text-[var(--p1)] transition-colors">
+                                    <SquarePen class="h-4 w-4" />
+                                </button>
+                                <button on:click={async () => { await slettTeknikklogg(selectedTeknikkLogg.id); activeModal = null; }}
+                                    class="p-1.5 rounded-lg hover:bg-red-50 text-slate-300 hover:text-red-500 transition-colors">
+                                    <Trash2 class="h-4 w-4" />
+                                </button>
+                            </div>
+                        </div>
+    
+                        <!-- Økt-boble (som session-modal) -->
+                        <div class="rounded-xl p-3.5 mb-3 {darkMode ? 'bg-sky-100' : 'bg-[#EBFAFF]/60'}">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-xl bg-white flex items-center justify-center flex-shrink-0">
+                                    <BookOpen class="h-5 w-5 text-[#0369A1]" />
+                                </div>
+                                <p class="font-bold text-sm leading-tight" style="color:{darkMode ? 'var(--card)' : '#1E293B'}">
+                                    Teknikk – {selectedTeknikkLogg.stilart}
+                                </p>
+                            </div>
+                        </div>
+    
+                        {#if selectedTeknikkLogg.tilbakemelding}
+                            <div class="rounded-xl p-3.5 mb-3 {darkMode ? '' : 'bg-slate-50'}"
+                                style="{darkMode ? 'background-color:var(--surface)' : ''}">
+                                <p class="text-xs font-bold uppercase tracking-widest mb-1.5"
+                                    style="color:{darkMode ? 'var(--p2)' : '#94A3B8'}">Kommentar</p>
+                                <p class="text-sm leading-relaxed"
+                                    style="color:{darkMode ? '#CBD5E1' : '#334155'}">{selectedTeknikkLogg.tilbakemelding}</p>
+                            </div>
+                        {/if}
+    
+                        {#if selectedTeknikkLogg.video_url}
+                            <div class="rounded-xl overflow-hidden border border-slate-100 mt-2">
+                                <video src={selectedTeknikkLogg.video_url} controls preload="none"
+                                    class="w-full bg-black"
+                                    style="max-height:340px; object-fit:contain">
+                                </video>
+                            </div>
+                        {/if}
+                    {/if}
                 </div>
             </div>
         </div>
