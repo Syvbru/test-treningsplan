@@ -226,7 +226,7 @@
                 loggedIn = true; isAdmin = data.isAdmin; username = data.username;
                 currentEditPlanSheet = data.editPlanSheet || "";
                 if (!data.isAdmin) {
-                    await Promise.all([loadWorkoutPlan(data.sheetUrl), loadFellesOkter()]);
+                    await Promise.all([loadWorkoutPlan(data.sheetUrl), loadFellesOkter(), hentTeknikk()]);
                     await tick(); scrollToAnchor();
                 }
             } else { loginError = data.error || "Innlogging feilet."; }
