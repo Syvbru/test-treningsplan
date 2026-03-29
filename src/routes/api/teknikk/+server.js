@@ -9,21 +9,26 @@ function getDb() {
     return neon(POSTGRES_URL); 
 }
 
-function getUserHash(cookies) {
-    const token = cookies.get('auth_token');
-    if (!token) throw new Error('Ikke innlogget');
-    const decoded = jwt.verify(token, JWT_SECRET);
-    return decoded.userKeyHash;
-}
-
 export async function GET({ cookies }) {
     try {
-        const userKeyHash = getUserHash(cookies);
+        const token = cookies.get('auth_token');
+        if (!token) throw new Error('Ikke innlogget');
+        const decoded = jwt.verify(token, JWT_SECRET);
+
+        let targetHash;
+        if (decoded.isAdmin) {
+            // Admin: bruk lagret hash fra cookie, ikke noe fra frontend
+            targetHash = cookies.get('last_search_hash');
+            if (!targetHash) return json([]);
+        } else {
+            targetHash = decoded.userKeyHash;
+        }
+
         const sql = getDb();
         const logger = await sql`
             SELECT id, dato, stilart, tilbakemelding, video_url, created_at
             FROM teknikk_logger
-            WHERE user_key_hash = ${userKeyHash}
+            WHERE user_key_hash = ${targetHash}
             ORDER BY dato DESC, created_at DESC
         `;
         return json(logger);
