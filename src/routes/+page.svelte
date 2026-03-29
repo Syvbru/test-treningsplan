@@ -1246,145 +1246,138 @@
               <div class="bg-white rounded-2xl border border-slate-200 p-4 mb-4">
                 <h3 class="font-bold text-sm text-[var(--p1)] mb-3">Logg ny teknikkøkt</h3>
             
-                <!-- TEKNIKKLOGG KORT -->
-                <div class="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory"
-                    style="scrollbar-width:none; -webkit-overflow-scrolling:touch;">
-                    {#if teknikkLogger.length === 0}
-                        <div class="bg-white rounded-2xl border border-slate-200 p-6 text-center w-full">
-                            <Video class="h-8 w-8 text-slate-300 mx-auto mb-2" />
-                            <p class="text-sm text-slate-400">Ingen teknikkøkter logget ennå.</p>
-                        </div>
-                    {:else}
-                        {#each teknikkLogger as logg}
-                            <button
-                                class="flex-shrink-0 snap-start w-36 rounded-2xl p-3 text-left bg-white border border-slate-200 hover:border-[var(--p1)] flex flex-col transition-all duration-150"
-                                on:click={() => { selectedTeknikkLogg = logg; activeModal = "teknikk"; }}>
-                
-                                <!-- Dato-rad -->
-                                <div class="flex items-center justify-between w-full mb-2">
-                                    <span class="text-xs font-semibold text-[var(--p2)]">
-                                        {format(parseISO(logg.dato), 'EEE', { locale: nb })}
-                                    </span>
-                                    <span class="text-xs font-bold text-[var(--p2)]">
-                                        {format(parseISO(logg.dato), 'dd.MM')}
-                                    </span>
-                                </div>
-                
-                                <!-- Overskrift -->
-                                <p class="text-sm font-bold italic uppercase leading-tight text-[var(--p2)] mb-2">
-                                    Teknikk {logg.stilart}
-                                </p>
-                
-                                <!-- Ikon -->
-                                <BookOpen class="h-6 w-6 text-[var(--p2)] mb-2" />
-                
-                                <!-- Dato lang -->
-                                <p class="text-xs text-[var(--p2)] flex-1 leading-snug">
-                                    {format(parseISO(logg.dato), 'd. MMM yyyy', { locale: nb })}
-                                </p>
-                
-                                <!-- Bunn: kommentar- og videoikon -->
-                                <div class="flex items-center gap-2 w-full pt-1.5 mt-3 border-t border-slate-100 text-[var(--p2)]">
-                                    {#if logg.tilbakemelding}
-                                        <MessageSquare class="h-3.5 w-3.5" />
-                                    {/if}
-                                    {#if logg.video_url}
-                                        <Video class="h-3.5 w-3.5" />
-                                    {/if}
-                                </div>
-                            </button>
-                        {/each}
-                    {/if}
-                </div>    
-              </div>
-            {/if}
-        
-            <div class="flex flex-col gap-3">
-                {#if teknikkLogger.length === 0}
-                    <div class="bg-white rounded-2xl border border-slate-200 p-6 text-center">
-                        <Video class="h-8 w-8 text-slate-300 mx-auto mb-2" />
-                        <p class="text-sm text-slate-400">Ingen teknikkøkter logget ennå.</p>
+                <!-- TEKNIKKLOGG -->
+                <section>
+                    <div class="flex items-center justify-between mb-3">
+                        <h2 class="text-base font-bold text-[var(--p1)]">Teknikklogg:</h2>
+                        <button on:click={() => { visTeknikkSkjema = !visTeknikkSkjema; teknikkFeil = ''; }}
+                            class="flex items-center gap-1.5 bg-[var(--p1)] text-white rounded-full px-3 py-1.5 text-xs font-bold hover:bg-[var(--p1)]/80 transition-colors">
+                            <Plus class="h-3.5 w-3.5" />
+                            Ny logg
+                        </button>
                     </div>
-                {:else}
-                    {#each teknikkLogger as logg}
-                        <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-                            {#if redigerLogg?.id === logg.id}
-                                <!-- REDIGERINGSMODUS -->
-                                <div class="p-4 flex flex-col gap-3">
-                                    <p class="font-bold text-sm text-[var(--p1)]">Rediger logg</p>
-                    
-                                    <div>
-                                        <label class="block text-xs font-semibold text-slate-500 uppercase tracking-widest mb-1">Dato</label>
-                                        <input type="date" bind:value={redigerDato}
-                                            class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-[var(--p1)] transition" />
-                                    </div>
-                    
-                                    <div>
-                                        <label class="block text-xs font-semibold text-slate-500 uppercase tracking-widest mb-1">Stilart</label>
-                                        <select bind:value={redigerStilart}
-                                            class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-[var(--p1)] transition
-                                                {redigerStilart ? 'text-slate-800' : 'text-slate-400'}">
-                                            <option value="Klassisk">Klassisk</option>
-                                            <option value="Skate">Skate</option>
-                                        </select>
-                                    </div>
-                    
-                                    <div>
-                                        <label class="block text-xs font-semibold text-slate-500 uppercase tracking-widest mb-1">Tilbakemelding</label>
-                                        <textarea bind:value={redigerTilbakemelding} rows="3"
-                                            class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-[var(--p1)] transition resize-none" />
-                                    </div>
-                    
-                                    <div class="flex gap-2">
-                                        <button on:click={() => redigerLogg = null}
-                                            class="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-500 hover:bg-slate-50 transition-colors">
-                                            Avbryt
-                                        </button>
-                                        <button on:click={lagreRediger}
-                                            disabled={redigerLaster || !redigerDato || !redigerStilart}
-                                            class="flex-1 rounded-xl bg-[var(--p1)] text-white py-2.5 text-sm font-bold disabled:opacity-40 transition-colors">
-                                            {redigerLaster ? 'Lagrer…' : 'Lagre'}
-                                        </button>
-                                    </div>
+                
+                    {#if visTeknikkSkjema}
+                        <div class="bg-white rounded-2xl border border-slate-200 p-4 mb-4">
+                            <h3 class="font-bold text-sm text-[var(--p1)] mb-3">Logg ny teknikkøkt</h3>
+                
+                            <div class="flex flex-col gap-3">
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-widest mb-1">Dato</label>
+                                    <input type="date" bind:value={teknikkDato}
+                                        class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-[var(--p1)] focus:ring-2 focus:ring-[var(--p1)]/20 transition
+                                            {teknikkDato ? 'text-slate-800' : 'text-slate-400'}" />
                                 </div>
-                            {:else}
-                                <!-- VISNINGMODUS -->
-                                <div class="p-4">
-                                    <div class="flex items-start justify-between gap-2">
-                                        <div class="flex-1 min-w-0">
-                                            <p class="font-bold text-[var(--p1)]">{logg.stilart}</p>
-                                            <p class="text-xs text-slate-400 mb-2">
-                                                {format(parseISO(logg.dato), 'd. MMMM yyyy', { locale: nb })}
-                                            </p>
-                                            {#if logg.tilbakemelding}
-                                                <p class="text-sm text-slate-600 leading-relaxed">{logg.tilbakemelding}</p>
-                                            {/if}
-                                        </div>
-                                        <div class="flex gap-1 flex-shrink-0">
-                                            <button on:click={() => startRediger(logg)}
-                                                class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-300 hover:text-[var(--p1)] transition-colors">
-                                                <SquarePen class="h-4 w-4" />
-                                            </button>
-                                            <button on:click={() => slettTeknikklogg(logg.id)}
-                                                class="p-1.5 rounded-lg hover:bg-red-50 text-slate-300 hover:text-red-500 transition-colors">
-                                                <Trash2 class="h-4 w-4" />
-                                            </button>
-                                        </div>
-                                    </div>
+                
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-widest mb-1">Stilart</label>
+                                    <select bind:value={teknikkStilart}
+                                        class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-[var(--p1)] transition
+                                            {teknikkStilart ? 'text-slate-800' : 'text-slate-400'}">
+                                        <option value="" disabled selected>Velg stilart…</option>
+                                        <option value="Klassisk">Klassisk</option>
+                                        <option value="Skate">Skate</option>
+                                    </select>
                                 </div>
-                            {/if}
-                    
-                            {#if logg.video_url && redigerLogg?.id !== logg.id}
-                                <video src={logg.video_url} controls preload="none"
-                                    class="w-full border-t border-slate-100 bg-black"
-                                    style="max-height:320px; object-fit:contain">
-                                </video>
-                            {/if}
+                
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-widest mb-1">Tilbakemelding / hva øvde du på</label>
+                                    <textarea bind:value={teknikkTilbakemelding} rows="3"
+                                        placeholder="F.eks. fokus på armtrekket, tilbakemelding fra trener…"
+                                        class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-[var(--p1)] transition resize-none
+                                            {teknikkTilbakemelding ? 'text-slate-800' : 'text-slate-400'}" />
+                                </div>
+                
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-widest mb-1">Video (valgfritt)</label>
+                                    <label class="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-200 p-4 cursor-pointer hover:border-[var(--p1)] transition-colors">
+                                        <input type="file" accept="video/*" class="hidden"
+                                            on:change={(e) => teknikkVideoFil = e.currentTarget.files?.[0] ?? null} />
+                                        {#if teknikkVideoFil}
+                                            <Video class="h-5 w-5 text-[var(--p1)] mb-1" />
+                                            <p class="text-sm text-[var(--p1)] font-semibold truncate max-w-full">{teknikkVideoFil.name}</p>
+                                            <p class="text-xs text-slate-400">{(teknikkVideoFil.size / 1024 / 1024).toFixed(1)} MB</p>
+                                        {:else}
+                                            <Video class="h-5 w-5 text-slate-300 mb-1" />
+                                            <p class="text-sm text-slate-400">Trykk for å velge video</p>
+                                        {/if}
+                                    </label>
+                                </div>
+                
+                                {#if teknikkLaster && uploadProgress > 0}
+                                    <div>
+                                        <div class="rounded-full overflow-hidden bg-slate-100 h-2">
+                                            <div class="h-2 bg-[var(--p1)] transition-all duration-200 rounded-full" style="width:{uploadProgress}%"></div>
+                                        </div>
+                                        <p class="text-xs text-center text-slate-400 mt-1">Laster opp video… {uploadProgress}%</p>
+                                    </div>
+                                {/if}
+                
+                                {#if teknikkFeil}
+                                    <p class="text-sm text-red-600 bg-red-50 rounded-xl px-3 py-2">{teknikkFeil}</p>
+                                {/if}
+                
+                                <div class="flex gap-2 pt-1">
+                                    <button on:click={() => { visTeknikkSkjema = false; teknikkFeil = ''; }}
+                                        class="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-500 hover:bg-slate-50 transition-colors">
+                                        Avbryt
+                                    </button>
+                                    <button on:click={lagreTeknikklogg}
+                                        disabled={teknikkLaster || !teknikkDato || !teknikkStilart}
+                                        class="flex-1 rounded-xl bg-[var(--p1)] text-white py-2.5 text-sm font-bold disabled:opacity-40 transition-colors">
+                                        {teknikkLaster ? (uploadProgress > 0 ? `${uploadProgress}%` : 'Lagrer…') : 'Lagre'}
+                                    </button>
+                                </div>
+                            </div>
                         </div>
-                    {/each}
-                {/if}
-            </div>
-        </section>
+                    {/if}
+                
+                    <!-- TEKNIKKLOGG KORT -->
+                    <div class="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory"
+                        style="scrollbar-width:none; -webkit-overflow-scrolling:touch;">
+                        {#if teknikkLogger.length === 0}
+                            <div class="bg-white rounded-2xl border border-slate-200 p-6 text-center w-full">
+                                <Video class="h-8 w-8 text-slate-300 mx-auto mb-2" />
+                                <p class="text-sm text-slate-400">Ingen teknikkøkter logget ennå.</p>
+                            </div>
+                        {:else}
+                            {#each teknikkLogger as logg}
+                                <button
+                                    class="flex-shrink-0 snap-start w-36 rounded-2xl p-3 text-left bg-white border border-slate-200 hover:border-[var(--p1)] flex flex-col transition-all duration-150"
+                                    on:click={() => { selectedTeknikkLogg = logg; activeModal = "teknikk"; }}>
+                
+                                    <div class="flex items-center justify-between w-full mb-2">
+                                        <span class="text-xs font-semibold text-[var(--p2)]">
+                                            {format(parseISO(logg.dato), 'EEE', { locale: nb })}
+                                        </span>
+                                        <span class="text-xs font-bold text-[var(--p2)]">
+                                            {format(parseISO(logg.dato), 'dd.MM')}
+                                        </span>
+                                    </div>
+                
+                                    <p class="text-sm font-bold italic uppercase leading-tight text-[var(--p2)] mb-2">
+                                        Teknikk {logg.stilart}
+                                    </p>
+                
+                                    <BookOpen class="h-6 w-6 text-[var(--p2)] mb-2" />
+                
+                                    <p class="text-xs text-[var(--p2)] flex-1 leading-snug">
+                                        {format(parseISO(logg.dato), 'd. MMM yyyy', { locale: nb })}
+                                    </p>
+                
+                                    <div class="flex items-center gap-2 w-full pt-1.5 mt-3 border-t border-slate-100 text-[var(--p2)]">
+                                        {#if logg.tilbakemelding}
+                                            <MessageSquare class="h-3.5 w-3.5" />
+                                        {/if}
+                                        {#if logg.video_url}
+                                            <Video class="h-3.5 w-3.5" />
+                                        {/if}
+                                    </div>
+                                </button>
+                            {/each}
+                        {/if}
+                    </div>
+                </section>
 
         <!-- TEKNIKKVIDEOER -->
         <section>
