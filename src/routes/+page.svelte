@@ -592,6 +592,14 @@
         if (hh > 0) return `${hh}`;
         return `${mm}m`;
     }
+
+    function cloudinaryThumb(url: string): string {
+        if (!url) return '';
+        return url
+            .replace('/video/upload/', '/video/upload/so_0,w_640/')
+            .replace(/\.(mp4|mov|avi|webm|mkv)$/i, '.jpg');
+    }
+
     $: linePoly = linePts.map(p => `${p.x},${p.y}`).join(" ");
     $: lineArea = linePts.length > 0
         ? `M ${linePts[0].x},88 ` + linePts.map(p => `L ${p.x},${p.y}`).join(" ") + ` L ${linePts[linePts.length-1].x},88 Z`
@@ -1314,44 +1322,54 @@
                 </div>
             {/if}
         
-            <div class="flex flex-col gap-3">
+            <div class="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory"
+                style="scrollbar-width:none; -webkit-overflow-scrolling:touch;">
+            
                 {#if teknikkLogger.length === 0}
-                    <div class="bg-white rounded-2xl border border-slate-200 p-6 text-center">
+                    <div class="bg-white rounded-2xl border border-slate-200 p-6 text-center w-full">
                         <Video class="h-8 w-8 text-slate-300 mx-auto mb-2" />
                         <p class="text-sm text-slate-400">Ingen teknikkøkter logget ennå.</p>
                     </div>
                 {:else}
                     {#each teknikkLogger as logg}
                         <button
-                            class="w-full rounded-2xl p-3 text-left bg-white border border-slate-200 hover:border-[var(--p1)] transition-all duration-150 flex flex-col"
+                            class="flex-shrink-0 snap-start w-36 rounded-2xl p-3 text-left bg-white border border-slate-200 hover:border-[var(--p1)] transition-all duration-150 flex flex-col"
                             on:click={() => { selectedTeknikkLogg = logg; activeModal = 'teknikk'; }}>
-                    
-                            <!-- Dato-rad -->
-                            <div class="flex items-center justify-between w-full mb-2">
-                                <span class="text-xs font-semibold text-[var(--p2)]">Teknikk</span>
-                                <span class="text-xs font-bold text-[var(--p2)]">
-                                    {format(parseISO(logg.dato), 'd. MMM yyyy', { locale: nb })}
-                                </span>
-                            </div>
-                    
-                            <!-- Stilart som tittel -->
-                            <p class="text-sm font-bold italic uppercase leading-tight text-[var(--p2)] mb-2">
+            
+                            <!-- Teknikk + stilart -->
+                            <p class="text-sm font-bold italic uppercase leading-tight text-[var(--p2)] mb-1">
+                                Teknikk
+                            </p>
+                            <p class="text-sm font-bold italic uppercase leading-tight text-[var(--p2)] mb-1.5">
                                 {logg.stilart}
                             </p>
-                    
-                            <!-- Ikon -->
-                            <div class="flex gap-1.5 mb-2">
-                                <BookOpen class="h-5 w-5 text-[var(--p2)]" />
-                            </div>
-                    
-                            <!-- Footer med kommentar/video-indikatorer -->
+            
+                            <!-- Dato -->
+                            <p class="text-xs font-semibold text-[var(--p2)] mb-3">
+                                {format(parseISO(logg.dato), 'd. MMM yyyy', { locale: nb })}
+                            </p>
+            
+                            <!-- Thumbnail om video finnes -->
+                            {#if logg.video_url}
+                                <div class="w-full rounded-lg overflow-hidden mb-2 bg-slate-100" style="aspect-ratio:16/9">
+                                    <img
+                                        src={cloudinaryThumb(logg.video_url)}
+                                        alt="Video thumbnail"
+                                        class="w-full h-full object-cover"
+                                        loading="lazy"
+                                        on:error={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                                    />
+                                </div>
+                            {/if}
+            
+                            <!-- Ikoner -->
                             {#if logg.tilbakemelding || logg.video_url}
-                                <div class="flex items-center gap-2 pt-1.5 mt-1 border-t border-slate-100 text-[var(--p2)]">
+                                <div class="flex items-center gap-2 mt-auto pt-1 text-[var(--p2)]">
                                     {#if logg.tilbakemelding}
-                                        <MessageSquare class="h-3.5 w-3.5" />
+                                        <MessageSquare class="h-5 w-5" />
                                     {/if}
                                     {#if logg.video_url}
-                                        <Video class="h-3.5 w-3.5" />
+                                        <Video class="h-5 w-5" />
                                     {/if}
                                 </div>
                             {/if}
@@ -1748,25 +1766,14 @@
                             </div>
                             <div class="flex gap-1 flex-shrink-0">
                                 <button on:click={() => startRediger(selectedTeknikkLogg)}
-                                    class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-300 hover:text-[var(--p1)] transition-colors">
-                                    <SquarePen class="h-4 w-4" />
+                                    class="bg-slate-100 hover:bg-slate-200 rounded-lg p-1.5 text-slate-500 transition-colors">
+                                    <SquarePen class="h-5 w-5" />
                                 </button>
                                 <button on:click={async () => { await slettTeknikklogg(selectedTeknikkLogg.id); activeModal = null; }}
-                                    class="p-1.5 rounded-lg hover:bg-red-50 text-slate-300 hover:text-red-500 transition-colors">
-                                    <Trash2 class="h-4 w-4" />
+                                    class="bg-slate-100 hover:bg-red-100 rounded-lg p-1.5 text-slate-500 hover:text-red-500 transition-colors">
+                                    <Trash2 class="h-5 w-5" />
                                 </button>
                             </div>
-                        </div>
-    
-                        <!-- Økt-boble (som session-modal) -->
-                        <div class="rounded-xl p-3.5 mb-3 {darkMode ? 'bg-sky-100' : 'bg-[#EBFAFF]/60'}">
-                            <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 rounded-xl bg-white flex items-center justify-center flex-shrink-0">
-                                    <BookOpen class="h-5 w-5 text-[#0369A1]" />
-                                </div>
-                                <p class="font-bold text-sm leading-tight" style="color:{darkMode ? 'var(--card)' : '#1E293B'}">
-                                    Teknikk – {selectedTeknikkLogg.stilart}
-                                </p>
                             </div>
                         </div>
     
