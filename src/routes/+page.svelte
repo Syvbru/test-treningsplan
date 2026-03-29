@@ -1333,15 +1333,12 @@
                 {:else}
                     {#each teknikkLogger as logg}
                         <button
-                            class="flex-shrink-0 snap-start w-36 rounded-2xl p-3 text-left bg-white border border-slate-200 hover:border-[var(--p1)] transition-all duration-150 flex flex-col"
+                            class="flex-shrink-0 snap-start w-44 rounded-2xl p-3 text-left bg-white border border-slate-200 hover:border-[var(--p1)] transition-all duration-150 flex flex-col"
                             on:click={() => { selectedTeknikkLogg = logg; activeModal = 'teknikk'; }}>
             
                             <!-- Teknikk + stilart -->
-                            <p class="text-sm font-bold italic uppercase leading-tight text-[var(--p2)] mb-1">
-                                Teknikk
-                            </p>
                             <p class="text-sm font-bold italic uppercase leading-tight text-[var(--p2)] mb-1.5">
-                                {logg.stilart}
+                                Teknikk {logg.stilart}
                             </p>
             
                             <!-- Dato -->
@@ -1712,11 +1709,6 @@
                         <div class="w-24 h-[5px] rounded-full bg-slate-300"></div>
                     </div>
     
-                    <button on:click={() => { activeModal = null; redigerLogg = null; }}
-                        class="hidden lg:flex absolute top-4 right-4 bg-slate-100 hover:bg-slate-200 rounded-lg p-1.5 text-slate-500 transition-colors">
-                        <X class="h-5 w-5" />
-                    </button>
-    
                     {#if redigerLogg?.id === selectedTeknikkLogg.id}
                         <!-- REDIGERINGSMODUS -->
                         <p class="font-bold text-lg text-[var(--p1)] mb-4">Rediger logg</p>
@@ -1773,6 +1765,10 @@
                                     class="bg-slate-100 hover:bg-red-100 rounded-lg p-1.5 text-slate-500 hover:text-red-500 transition-colors">
                                     <Trash2 class="h-5 w-5" />
                                 </button>
+                                <button on:click={() => { activeModal = null; redigerLogg = null; }}
+                                    class="hidden lg:flex bg-slate-100 hover:bg-slate-200 rounded-lg p-1.5 text-slate-500 transition-colors">
+                                    <X class="h-5 w-5" />
+                                </button>
                             </div>
                         </div>
     
@@ -1789,6 +1785,7 @@
                         {#if selectedTeknikkLogg.video_url}
                             <div class="rounded-xl overflow-hidden border border-slate-100 mt-2">
                                 <video src={selectedTeknikkLogg.video_url} controls preload="none"
+                                    poster={cloudinaryThumb(selectedTeknikkLogg.video_url)}
                                     class="w-full bg-black"
                                     style="max-height:340px; object-fit:contain">
                                 </video>
