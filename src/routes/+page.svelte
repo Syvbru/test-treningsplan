@@ -237,6 +237,7 @@
     async function searchUtoverByName() {
         const searchName = currentUtoverNavn.trim();
         if (!searchName) { loginError = "Skriv inn et navn"; return; }
+        teknikkLogger = [];
         loginError = ""; isLoading = true;
         try {
             const res = await fetch('/api/admin-search', {
@@ -262,6 +263,7 @@
         loggedIn = false; username = ""; password = ""; loginError = "";
         isLoading = false; isAdmin = false; currentUtoverNavn = ""; currentEditPlanSheet = "";
         workouts = []; fellesOkter = []; expandedDates.clear();
+        teknikkLogger = [];
         selectedDate = null; selectedSessionGroup = null; activeModal = null;
     }
 
