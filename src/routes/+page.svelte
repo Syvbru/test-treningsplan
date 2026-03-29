@@ -1774,7 +1774,6 @@
                                     <Trash2 class="h-5 w-5" />
                                 </button>
                             </div>
-                            </div>
                         </div>
     
                         {#if selectedTeknikkLogg.tilbakemelding}
