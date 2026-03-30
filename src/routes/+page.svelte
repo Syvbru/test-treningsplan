@@ -1091,7 +1091,7 @@
                         <div>
                             <label class="block text-xs font-semibold uppercase tracking-widest mb-1">Dato</label>
                             <input type="date" bind:value={teknikkDato}
-                                class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-[var(--p1)] focus:ring-2 focus:ring-[var(--p1)]/20 transition" />
+                                class="w-full max-w-full min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-[var(--p1)] focus:ring-2 focus:ring-[var(--p1)]/20 transition" />
                         </div>
         
                         <div>
@@ -1142,7 +1142,8 @@
         
                         <div class="flex gap-2 pt-1">
                             <button on:click={() => { visTeknikkSkjema = false; teknikkFeil = ''; }}
-                                class="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-500 hover:bg-slate-50 transition-colors">
+                                class="flex-1 rounded-xl border py-2.5 text-sm font-semibold hover:bg-slate-50 transition-colors"
+                                style="border-color:{darkMode ? '#F1F5F9' : '#64748B'}; color:{darkMode ? '#F1F5F9' : '#64748B'}">
                                 Avbryt
                             </button>
                             <button on:click={lagreTeknikklogg}
@@ -1722,7 +1723,7 @@
                     {#if redigerLogg?.id === selectedTeknikkLogg.id}
                         <!-- REDIGERINGSMODUS -->
                         <p class="font-bold text-lg text-[var(--p1)] mb-4">Rediger logg</p>
-                        <div class="flex flex-col gap-3">
+                        <div class="teknikk-skjema flex flex-col gap-3">
                             <div>
                                 <label class="block text-xs font-semibold text-slate-500 uppercase tracking-widest mb-1">Dato</label>
                                 <input type="date" bind:value={redigerDato}
@@ -1744,7 +1745,8 @@
                             </div>
                             <div class="flex gap-2">
                                 <button on:click={() => redigerLogg = null}
-                                    class="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-500 hover:bg-slate-50 transition-colors">
+                                    class="flex-1 rounded-xl border py-2.5 text-sm font-semibold hover:bg-slate-50 transition-colors"
+                                    style="border-color:{darkMode ? '#F1F5F9' : '#64748B'}; color:{darkMode ? '#F1F5F9' : '#64748B'}">
                                     Avbryt
                                 </button>
                                 <button on:click={async () => { await lagreRediger(); selectedTeknikkLogg = teknikkLogger.find(l => l.id === redigerLogg?.id) ?? null; }}
