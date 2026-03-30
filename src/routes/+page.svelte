@@ -874,35 +874,35 @@
 </style>
 
 {#if !loggedIn}
-<div class="fixed inset-0 flex items-center justify-center bg-gradient-to-br from-[#19747E] via-[#19747E]/80 to-[#19747E]/60 p-4">
-    <div class="w-full max-w-sm bg-white rounded-3xl p-8 shadow-2xl">
+<div class="fixed inset-0 flex items-center justify-center bg-gradient-to-br from-[#0D1B2A] via-[#0D1B2A]/80 to-[#132030] p-4">
+    <div class="w-full max-w-sm bg-[#132030] rounded-3xl p-8 shadow-2xl border border-[#1E3448]">
         <h2 class="text-center font-bold text-3xl mb-1">
-            <span class="text-[#A9D6E5] italic">TRENINGS</span><span class="text-[#19747E] italic">PLAN</span>
+            <span class="text-[#cbff71] italic">TRENINGS</span><span class="text-[#92e811] italic">PLAN</span>
         </h2>
-        <p class="text-center text-slate-400 text-sm mb-8">Logg inn for å se din treningsplan</p>
+        <p class="text-center text-[#64748B] text-sm mb-8">Logg inn for å se din treningsplan</p>
 
         <div class="mb-4">
-            <label for="username" class="block text-xs font-semibold text-slate-500 uppercase tracking-widest mb-1.5">Brukernavn</label>
+            <label for="username" class="block text-xs font-semibold text-[#CBD5E1] uppercase tracking-widest mb-1.5">Brukernavn</label>
             <input id="username" type="text" bind:value={username} disabled={isLoading}
-                class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-base focus:border-[#19747E]/60 focus:ring-2 focus:ring-[#19747E] outline-none transition disabled:opacity-60"
+                class="w-full rounded-xl border border-[#1E3448] bg-[#1E3045] text-[#F1F5F9] px-4 py-3 text-base focus:border-[#92e811]/60 focus:ring-2 focus:ring-[#92e811] outline-none transition disabled:opacity-60 placeholder-slate-500"
                 placeholder="Ditt brukernavn" autocomplete="username" />
         </div>
         <div class="mb-6">
-            <label for="password" class="block text-xs font-semibold text-slate-500 uppercase tracking-widest mb-1.5">Passord</label>
+            <label for="password" class="block text-xs font-semibold text-[#CBD5E1] uppercase tracking-widest mb-1.5">Passord</label>
             <input id="password" type="password" bind:value={password} disabled={isLoading}
                 on:keydown={(e) => { if (e.key === "Enter") handleLogin(); }}
-                class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-base focus:border-[#19747E]/60 focus:ring-2 focus:ring-[#19747E] outline-none transition disabled:opacity-60"
+                class="w-full rounded-xl border border-[#1E3448] bg-[#1E3045] text-[#F1F5F9] px-4 py-3 text-base focus:border-[#92e811]/60 focus:ring-2 focus:ring-[#92e811] outline-none transition disabled:opacity-60 placeholder-slate-500"
                 placeholder="••••••••" autocomplete="current-password" />
         </div>
 
         {#if loginError}
-            <div class="mb-4 rounded-xl bg-red-50 border border-red-200 p-3 text-sm text-red-700">{loginError}</div>
+            <div class="mb-4 rounded-xl bg-red-900/30 border border-red-800 p-3 text-sm text-red-200">{loginError}</div>
         {/if}
 
         <button on:click={handleLogin} disabled={isLoading || !username || !password}
-            class="w-full flex items-center justify-center gap-2 rounded-xl bg-[#19747E] text-white py-3 text-base font-bold tracking-wide transition disabled:opacity-40 disabled:cursor-not-allowed">
+            class="w-full flex items-center justify-center gap-2 rounded-xl bg-[#92e811] text-[#132030] py-3 text-base font-bold tracking-wide transition disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#cbff71]">
             {#if isLoading}
-                <svg class="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                <svg class="h-5 w-5 animate-spin text-[#132030]" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
@@ -1088,7 +1088,7 @@
                     <h3 class="font-bold text-sm text-[var(--p1)] mb-3">Logg ny teknikkøkt</h3>
         
                     <div class="flex flex-col gap-3">
-                        <div>
+                        <div class="w-full min-w-0">
                             <label class="block text-xs font-semibold uppercase tracking-widest mb-1">Dato</label>
                             <input type="date" bind:value={teknikkDato}
                                 class="w-full max-w-full min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-[var(--p1)] focus:ring-2 focus:ring-[var(--p1)]/20 transition" />
