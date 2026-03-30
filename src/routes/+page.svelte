@@ -1724,7 +1724,7 @@
                         <!-- REDIGERINGSMODUS -->
                         <p class="font-bold text-lg text-[var(--p1)] mb-4">Rediger logg</p>
                         <div class="teknikk-skjema flex flex-col gap-3">
-                            <div>
+                            <div class="w-full min-w-0 overflow-hidden">
                                 <label class="block text-xs font-semibold text-slate-500 uppercase tracking-widest mb-1">Dato</label>
                                 <input type="date" bind:value={redigerDato}
                                     class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-[var(--p1)] transition" />
