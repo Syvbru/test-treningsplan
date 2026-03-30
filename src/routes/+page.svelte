@@ -1088,10 +1088,10 @@
                     <h3 class="font-bold text-sm text-[var(--p1)] mb-3">Logg ny teknikkøkt</h3>
         
                     <div class="flex flex-col gap-3">
-                        <div class="w-full min-w-0">
+                        <div class="w-full min-w-0 overflow-hidden">
                             <label class="block text-xs font-semibold uppercase tracking-widest mb-1">Dato</label>
                             <input type="date" bind:value={teknikkDato}
-                                class="w-full max-w-full min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-[var(--p1)] focus:ring-2 focus:ring-[var(--p1)]/20 transition" />
+                                class="w-full appearance-none max-w-full min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-[var(--p1)] focus:ring-2 focus:ring-[var(--p1)]/20 transition" />
                         </div>
         
                         <div>
