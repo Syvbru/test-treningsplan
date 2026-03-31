@@ -709,14 +709,15 @@
         dato: string;
         stilart: string;
         tilbakemelding: string;
-        video_url: string | null;
+        video_urls: string[];
     };
     
     let teknikkLogger: TeknikkLogg[] = [];
     let teknikkDato = '';
     let teknikkStilart = '';
     let teknikkTilbakemelding = '';
-    let teknikkVideoFil: File | null = null;
+    let teknikkVideoFiler: File[] = [];
+    let uploadProgressList: number[] = [];
     let teknikkLaster = false;
     let teknikkFeil = '';
     let visTeknikkSkjema = false;
@@ -725,10 +726,16 @@
     async function hentTeknikk() {
         try {
             const res = await fetch('/api/teknikk');
-            if (res.ok) teknikkLogger = await res.json();
+            if (res.ok) {
+                const data = await res.json();
+                teknikkLogger = data.map((logg: any) => ({
+                    ...logg,
+                    video_urls: Array.isArray(logg.video_urls) ? logg.video_urls : []
+                }));
+            }
         } catch {}
     }
-    
+        
     function uploadTilCloudinary(fil: File): Promise<string> {
         return new Promise((resolve, reject) => {
             const fd = new FormData();
@@ -759,36 +766,58 @@
         if (!teknikkDato || !teknikkStilart) return;
         teknikkLaster = true;
         teknikkFeil = '';
-        uploadProgress = 0;
-    
+        uploadProgressList = teknikkVideoFiler.map(() => 0);
+
         try {
-            let video_url = '';
-    
-            if (teknikkVideoFil) {
-                video_url = await uploadTilCloudinary(teknikkVideoFil);
+            const video_urls: string[] = [];
+            const totalBytes = teknikkVideoFiler.reduce((s, f) => s + f.size, 0);
+            const loadedPerFile = new Array(teknikkVideoFiler.length).fill(0);
+
+            for (let i = 0; i < teknikkVideoFiler.length; i++) {
+                const url = await new Promise<string>((resolve, reject) => {
+                    const fd = new FormData();
+                    fd.append('file', teknikkVideoFiler[i]);
+                    fd.append('upload_preset', PUBLIC_CLOUDINARY_UPLOAD_PRESET);
+                    const xhr = new XMLHttpRequest();
+                    xhr.open('POST', `https://api.cloudinary.com/v1_1/${PUBLIC_CLOUDINARY_CLOUD_NAME}/video/upload`);
+                    xhr.upload.onprogress = (e) => {
+                        if (e.lengthComputable) {
+                            loadedPerFile[i] = e.loaded;
+                            const totalLoaded = loadedPerFile.reduce((s, b) => s + b, 0);
+                            uploadProgress = Math.round((totalLoaded / totalBytes) * 100);
+                        }
+                    };
+                    xhr.onload = () => xhr.status === 200
+                        ? resolve(JSON.parse(xhr.responseText).secure_url)
+                        : reject(new Error(`Cloudinary: ${JSON.parse(xhr.responseText)?.error?.message ?? xhr.status}`));
+                    xhr.onerror = () => reject(new Error('Nettverksfeil'));
+                    xhr.send(fd);
+                });
+                video_urls.push(url);
             }
-    
+
             const res = await fetch('/api/teknikk', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ dato: teknikkDato, stilart: teknikkStilart, tilbakemelding: teknikkTilbakemelding, video_url })
+                body: JSON.stringify({ dato: teknikkDato, stilart: teknikkStilart, tilbakemelding: teknikkTilbakemelding, video_urls })
             });
-    
+
             if (res.ok) {
-                teknikkDato = '';
-                teknikkStilart = '';
-                teknikkTilbakemelding = '';
-                teknikkVideoFil = null;
-                visTeknikkSkjema = false;
+                teknikkDato = ''; teknikkStilart = ''; teknikkTilbakemelding = '';
+                teknikkVideoFiler = []; visTeknikkSkjema = false;
                 await hentTeknikk();
             } else {
-                teknikkFeil = 'Kunne ikke lagre. Prøv igjen.';
+                // Les faktisk feilmelding fra serveren
+                const data = await res.json().catch(() => ({}));
+                teknikkFeil = data.error ?? `Serverfeil (${res.status})`;
             }
-        } catch {
-            teknikkFeil = 'Noe gikk galt. Prøv igjen.';
+        } catch (error) {
+            // Vis den faktiske feilen i stedet for en generisk tekst
+            teknikkFeil = error instanceof Error ? error.message : String(error);
         } finally {
             teknikkLaster = false;
             uploadProgress = 0;
+            uploadProgressList = [];
         }
     }
     
@@ -808,19 +837,57 @@
     let redigerDato = '';
     let redigerStilart = '';
     let redigerTilbakemelding = '';
+    let redigerVideoUrls: string[] = [];
+    let redigerNyeVideoFiler: File[] = [];
+    let redigerUploadProgress: number[] = [];
+    let redigerFeil = '';
     let redigerLaster = false;
     
     function startRediger(logg: TeknikkLogg) {
         redigerLogg = logg;
-        redigerDato = logg.dato;
+        redigerDato = logg.dato.slice(0, 10);
         redigerStilart = logg.stilart;
         redigerTilbakemelding = logg.tilbakemelding;
+        redigerVideoUrls = [...(logg.video_urls ?? [])];
     }
     
     async function lagreRediger() {
         if (!redigerLogg || !redigerDato || !redigerStilart) return;
         redigerLaster = true;
+        redigerFeil = '';
+        uploadProgress = 0;
+
         try {
+            const nyeUrls: string[] = [];
+
+            if (redigerNyeVideoFiler.length > 0) {
+                const totalBytes = redigerNyeVideoFiler.reduce((s, f) => s + f.size, 0);
+                const loadedPerFile = new Array(redigerNyeVideoFiler.length).fill(0);
+
+                for (let i = 0; i < redigerNyeVideoFiler.length; i++) {
+                    const url = await new Promise<string>((resolve, reject) => {
+                        const fd = new FormData();
+                        fd.append('file', redigerNyeVideoFiler[i]);
+                        fd.append('upload_preset', PUBLIC_CLOUDINARY_UPLOAD_PRESET);
+                        const xhr = new XMLHttpRequest();
+                        xhr.open('POST', `https://api.cloudinary.com/v1_1/${PUBLIC_CLOUDINARY_CLOUD_NAME}/video/upload`);
+                        xhr.upload.onprogress = (e) => {
+                            if (e.lengthComputable) {
+                                loadedPerFile[i] = e.loaded;
+                                const totalLoaded = loadedPerFile.reduce((s, b) => s + b, 0);
+                                uploadProgress = Math.round((totalLoaded / totalBytes) * 100);
+                            }
+                        };
+                        xhr.onload = () => xhr.status === 200
+                            ? resolve(JSON.parse(xhr.responseText).secure_url)
+                            : reject(new Error(`Cloudinary: ${JSON.parse(xhr.responseText)?.error?.message ?? xhr.status}`));
+                        xhr.onerror = () => reject(new Error('Nettverksfeil'));
+                        xhr.send(fd);
+                    });
+                    nyeUrls.push(url);
+                }
+            }
+
             const res = await fetch('/api/teknikk', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
@@ -828,15 +895,35 @@
                     id: redigerLogg.id,
                     dato: redigerDato,
                     stilart: redigerStilart,
-                    tilbakemelding: redigerTilbakemelding
+                    tilbakemelding: redigerTilbakemelding,
+                    video_urls: [...redigerVideoUrls, ...nyeUrls]
                 })
             });
+
             if (res.ok) {
                 redigerLogg = null;
+                redigerNyeVideoFiler = [];
                 await hentTeknikk();
+            } else {
+                const data = await res.json().catch(() => ({}));
+                redigerFeil = data.error ?? `Serverfeil (${res.status})`;
             }
-        } catch {}
-        finally { redigerLaster = false; }
+        } catch (error) {
+            redigerFeil = error instanceof Error ? error.message : String(error);
+        } finally {
+            redigerLaster = false;
+            uploadProgress = 0;
+        }
+    }
+
+    let playingIndex = null;
+
+    function handlePlay(i) {
+        playingIndex = i;
+    }
+
+    function handlePause() {
+        playingIndex = null;
     }
 
 </script>
@@ -874,7 +961,7 @@
 </style>
 
 {#if !loggedIn}
-<div class="fixed inset-0 flex items-center justify-center bg-gradient-to-br from-[#0D1B2A] via-[#0D1B2A]/80 to-[#132030] p-4">
+<div class="fixed inset-0 flex items-center justify-center bg-gradient-to-br from-[#0D1B2A] via-[#0D1B2A]/95 to-[#132030] p-4">
     <div class="w-full max-w-sm bg-[#132030] rounded-3xl p-8 shadow-2xl border border-[#1E3448]">
         <h2 class="text-center font-bold text-3xl mb-1">
             <span class="text-[#cbff71] italic">TRENINGS</span><span class="text-[#92e811] italic">PLAN</span>
@@ -1114,15 +1201,29 @@
                         <div>
                             <label class="block text-xs font-semibold uppercase tracking-widest mb-1">Video (valgfritt)</label>
                             <label class="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-200 p-4 cursor-pointer hover:border-[var(--p1)] transition-colors">
-                                <input type="file" accept="video/*" class="hidden"
-                                    on:change={(e) => teknikkVideoFil = e.currentTarget.files?.[0] ?? null} />
-                                {#if teknikkVideoFil}
+                            <input type="file" accept="video/*" multiple class="hidden"
+                                on:change={(e) => {
+                                    const valgte = Array.from(e.currentTarget.files ?? []);
+                                    if (valgte.length > 6) {
+                                        teknikkFeil = 'Maks 6 videoer per logg.';
+                                        return;
+                                    }
+                                    teknikkFeil = '';
+                                    teknikkVideoFiler = valgte;
+                                }} />
+                                {#if teknikkVideoFiler.length > 0}
                                     <Video class="h-5 w-5 text-[var(--p1)] mb-1" />
-                                    <p class="text-sm text-[var(--p1)] font-semibold truncate max-w-full">{teknikkVideoFil.name}</p>
-                                    <p class="text-xs text-slate-400">{(teknikkVideoFil.size / 1024 / 1024).toFixed(1)} MB</p>
+                                    {#each teknikkVideoFiler as fil, i}
+                                        <p class="text-sm text-[var(--p1)] font-semibold truncate max-w-full">{fil.name}</p>
+                                        {#if uploadProgressList[i] > 0}
+                                            <div class="w-full rounded-full overflow-hidden bg-slate-100 h-1.5 mt-1">
+                                                <div class="h-1.5 bg-[var(--p1)] rounded-full transition-all" style="width:{uploadProgressList[i]}%"></div>
+                                            </div>
+                                        {/if}
+                                    {/each}
                                 {:else}
                                     <Video class="h-5 w-5 text-slate-300 mb-1" />
-                                    <p class="text-sm text-slate-400">Trykk for å velge video</p>
+                                    <p class="text-sm text-slate-400">Trykk for å velge én eller flere videoer</p>
                                 {/if}
                             </label>
                         </div>
@@ -1130,9 +1231,12 @@
                         {#if teknikkLaster && uploadProgress > 0}
                             <div>
                                 <div class="rounded-full overflow-hidden bg-slate-100 h-2">
-                                    <div class="h-2 bg-[var(--p1)] transition-all duration-200 rounded-full" style="width:{uploadProgress}%"></div>
+                                    <div class="h-2 bg-[var(--p1)] transition-all duration-200 rounded-full"
+                                        style="width:{uploadProgress}%"></div>
                                 </div>
-                                <p class="text-xs text-center text-slate-400 mt-1">Laster opp video… {uploadProgress}%</p>
+                                <p class="text-xs text-center text-slate-400 mt-1">
+                                    {teknikkVideoFiler.length > 1 ? `Laster opp videoer… ` : `Laster opp video… `}{uploadProgress}%
+                                </p>
                             </div>
                         {/if}
         
@@ -1181,25 +1285,21 @@
                             </p>
             
                             <!-- Thumbnail om video finnes -->
-                            {#if logg.video_url}
+                            {#if logg.video_urls?.length > 0}
                                 <div class="w-full rounded-lg overflow-hidden mb-2 bg-slate-100" style="aspect-ratio:16/9">
-                                    <img
-                                        src={cloudinaryThumb(logg.video_url)}
-                                        alt="Video thumbnail"
-                                        class="w-full h-full object-cover"
-                                        loading="lazy"
-                                        on:error={(e) => e.currentTarget?.remove()}
-                                    />
+                                    <img src={cloudinaryThumb(logg.video_urls[0])} alt="Video thumbnail"
+                                        class="w-full h-full object-cover" loading="lazy"
+                                        on:error={(e) => e.currentTarget?.remove()} />
                                 </div>
                             {/if}
             
                             <!-- Ikoner -->
-                            {#if logg.tilbakemelding || logg.video_url}
+                            {#if logg.tilbakemelding || logg.video_urls?.length > 0}
                                 <div class="flex items-center gap-2 mt-auto pt-1 text-[var(--p2)]">
                                     {#if logg.tilbakemelding}
                                         <MessageSquare class="h-5 w-5" />
                                     {/if}
-                                    {#if logg.video_url}
+                                    {#if logg.video_urls?.length > 0}
                                         <Video class="h-5 w-5" />
                                     {/if}
                                 </div>
@@ -1743,6 +1843,76 @@
                                 <textarea bind:value={redigerTilbakemelding} rows="3"
                                     class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-[var(--p1)] transition resize-none" />
                             </div>
+                            {#if redigerVideoUrls.length > 0}
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">
+                                        Videoer ({redigerVideoUrls.length})
+                                    </label>
+                                    <div class="flex flex-col gap-2">
+                                        {#each redigerVideoUrls as url, i}
+                                            <div class="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                                                <Video class="h-4 w-4 text-[var(--p1)] flex-shrink-0" />
+                                                <span class="text-xs text-slate-500 truncate flex-1">Video {i + 1}</span>
+                                                <button
+                                                    on:click={() => redigerVideoUrls = redigerVideoUrls.filter((_, j) => j !== i)}
+                                                    class="text-red-400 hover:text-red-600 transition-colors flex-shrink-0"
+                                                    title="Fjern video">
+                                                    <X class="h-4 w-4" />
+                                                </button>
+                                            </div>
+                                        {/each}
+                                    </div>
+                                </div>
+                            {/if}
+                            <!-- Last opp nye videoer -->
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-widest mb-1">
+                                    Legg til video
+                                </label>
+                                <label class="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-200 p-4 cursor-pointer hover:border-[var(--p1)] transition-colors">
+                                    <input type="file" accept="video/*" multiple class="hidden"
+                                        on:change={(e) => {
+                                            const valgte = Array.from(e.currentTarget.files ?? []);
+                                            if (redigerVideoUrls.length + valgte.length > 6) {
+                                                redigerFeil = `Maks 6 videoer per logg. Du har allerede ${redigerVideoUrls.length}.`;
+                                                return;
+                                            }
+                                            redigerFeil = '';
+                                            redigerNyeVideoFiler = valgte;
+                                        }} />
+                                    {#if redigerNyeVideoFiler.length > 0}
+                                        <Video class="h-5 w-5 text-[var(--p1)] mb-1" />
+                                        {#each redigerNyeVideoFiler as fil, i}
+                                            <p class="text-sm text-[var(--p1)] font-semibold truncate max-w-full">{fil.name}</p>
+                                            {#if redigerUploadProgress[i] > 0}
+                                                <div class="w-full rounded-full overflow-hidden bg-slate-100 h-1.5 mt-1">
+                                                    <div class="h-1.5 bg-[var(--p1)] rounded-full transition-all"
+                                                        style="width:{redigerUploadProgress[i]}%"></div>
+                                                </div>
+                                            {/if}
+                                        {/each}
+                                    {:else}
+                                        <Video class="h-5 w-5 text-slate-300 mb-1" />
+                                        <p class="text-sm text-slate-400">Trykk for å legge til video(er)</p>
+                                    {/if}
+                                </label>
+                            </div>
+
+                            {#if redigerLaster && uploadProgress > 0}
+                                <div>
+                                    <div class="rounded-full overflow-hidden bg-slate-100 h-2">
+                                        <div class="h-2 bg-[var(--p1)] transition-all duration-200 rounded-full"
+                                            style="width:{uploadProgress}%"></div>
+                                    </div>
+                                    <p class="text-xs text-center text-slate-400 mt-1">
+                                        {redigerNyeVideoFiler.length > 1 ? 'Laster opp videoer… ' : 'Laster opp video… '}{uploadProgress}%
+                                    </p>
+                                </div>
+                            {/if}
+
+                            {#if redigerFeil}
+                                <p class="text-sm text-red-600 bg-red-50 rounded-xl px-3 py-2">{redigerFeil}</p>
+                            {/if}
                             <div class="flex gap-2">
                                 <button on:click={() => redigerLogg = null}
                                     class="flex-1 rounded-xl border py-2.5 text-sm font-semibold hover:bg-slate-50 transition-colors"
@@ -1794,13 +1964,24 @@
                             </div>
                         {/if}
     
-                        {#if selectedTeknikkLogg.video_url}
-                            <div class="rounded-xl overflow-hidden border border-slate-100 mt-2">
-                                <video src={selectedTeknikkLogg.video_url} controls preload="none"
-                                    poster={cloudinaryThumb(selectedTeknikkLogg.video_url)}
-                                    class="w-full bg-black"
-                                    style="max-height:340px; object-fit:contain">
-                                </video>
+                        {#if selectedTeknikkLogg.video_urls?.length > 0}
+                            <div class="flex flex-col gap-3 mt-2">
+                                {#each selectedTeknikkLogg.video_urls as url, i}
+                                    <div class="rounded-xl overflow-hidden border border-slate-100">
+                                        <video
+                                            src={url}
+                                            controls
+                                            preload="none"
+                                            poster={cloudinaryThumb(url)}
+                                            playsinline
+                                            on:play={() => handlePlay(i)}
+                                            on:pause={handlePause}
+                                            class="w-full bg-black aspect-video"
+                                            style={`max-height:340px; object-fit:${playingIndex === i ? 'contain' : 'cover'}`}
+                                        >
+                                        </video>
+                                    </div>
+                                {/each}
                             </div>
                         {/if}
                     {/if}
