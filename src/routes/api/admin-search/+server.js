@@ -53,6 +53,14 @@ export async function POST({ request, cookies }) {
             sameSite: 'strict',
             maxAge: 60 * 60 * 24 * 365
         });
+
+        cookies.set('last_search_name', searchName, {
+            path: '/',
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            maxAge: 60 * 60 * 24 * 365
+        });
         
         return json({ 
             success: true, 
