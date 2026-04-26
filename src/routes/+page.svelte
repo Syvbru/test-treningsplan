@@ -389,7 +389,7 @@
             return { icon: BatteryCharging, color: "text-green-600", bg: "bg-green-100", hex: "#15803D", hexBg: "#F0FDF4", darkBg: "bg-green-500" };
         if (lower.includes("langtur"))
             return { icon: Heart, color: "text-[#08BFB0]", bg: "bg-[#c2fffa]/70", hex: "#0F766E", hexBg: "#F0FDFA", darkBg: "bg-teal-400" };
-        if (lower.includes("hurtighet"))
+        if (lower.includes("hurtighet") || lower.includes("fartsøkt"))
             return { icon: Zap, color: "text-[#A9D6E5]", bg: "bg-[#EBFAFF]/60", hex: "#0369A1", hexBg: "#F0F9FF", darkBg: "bg-sky-100" };
         if (lower.includes("teknikk"))
             return { icon: BookOpen, color: "text-[#A9D6E5]", bg: "bg-[#EBFAFF]/60", hex: "#0369A1", hexBg: "#F0F9FF", darkBg: "bg-sky-100" };
@@ -411,6 +411,7 @@
         if (lower.includes("styrke")) return "Styrke";
         if (lower.includes("teknikk")) return "Teknikk";
         if (lower.includes("hurtighet")) return "Hurtighet";
+        if (lower.includes("fartsøkt")) return "Fartsøkt";
         if (lower.includes("skiskole")) return "Skiskole";
         if (lower.includes("valgfri")) return "Valgfri";
         if (lower.includes("skiskyting")) return "Skiskyting";
