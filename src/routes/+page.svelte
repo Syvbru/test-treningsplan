@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { PUBLIC_CLOUDINARY_CLOUD_NAME, PUBLIC_CLOUDINARY_UPLOAD_PRESET } from '$env/static/public'
+    import { PUBLIC_CLOUDINARY_CLOUD_NAME, PUBLIC_CLOUDINARY_UPLOAD_PRESET } from '$env/static/public';
     import { tick } from "svelte";
     import Papa from "papaparse";
     import {
@@ -382,7 +382,7 @@
     // ─────────────────────────────────────────────────────────────────────────────
     function getWorkoutInfo(title: string, dark: boolean = false) {
         const lower = title.toLowerCase();
-        const isHard = lower.includes("motbakkeløp") || lower.includes("sprint") || lower.includes("sprintøkt") || lower.includes("distanseøkt") || /(rennet|(?<!lang)renn(?!forbered))/u.test(lower) || lower.includes("dsv-cup") || lower.includes("km ") || lower.includes(" km") || lower.includes("birken") || lower.includes("klubbmesterskap") || lower.includes("skifestival") || lower.includes("vestmarka opp") || lower.includes("gjelleråsbakken") || lower.includes("askerspurten") || lower.includes("oslo marat") || lower.includes("terrengløp")|| lower.includes("10 for grete") || lower.includes("kong harald");
+        const isHard = lower.includes("motbakkeløp") || lower.includes("sprint") || lower.includes("sprintøkt") || lower.includes("distanseøkt") || /(rennet|(?<!lang)renn(?!forbered))/u.test(lower) || lower.includes("dsv-cup") || lower.includes("km ") || lower.includes(" km") || lower.includes("birken") || lower.includes("klubbmesterskap") || lower.includes("skifestival") || lower.includes("vestmarka opp") || lower.includes("gjelleråsbakken") || lower.includes("askerspurten") || lower.includes("oslo marat") || lower.includes("terrengløp")|| lower.includes("10 for grete") || lower.includes("kong harald") || lower.includes("nm stafett") || lower.includes("rulleskicup");
         if (lower.includes("intervall") || isHard)
             return { icon: Timer, color: "text-red-600", bg: "bg-red-100", hex: "#B91C1C", hexBg: "#FEF2F2", darkBg: "bg-red-500" };
         if (lower.includes("hvile"))
