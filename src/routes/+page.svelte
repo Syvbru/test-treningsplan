@@ -1,6 +1,7 @@
 <script lang="ts">
     import { PUBLIC_CLOUDINARY_CLOUD_NAME, PUBLIC_CLOUDINARY_UPLOAD_PRESET } from '$env/static/public';
     import { tick } from "svelte";
+    import { fly } from 'svelte/transition';
     import Papa from "papaparse";
     import {
         parse, format, startOfDay, addDays, subDays, addMonths, subMonths,
@@ -568,10 +569,11 @@
 
     // Pre-computed chart values (avoids {@const} outside block elements)
     $: barMaxV = Math.max(...barStats.items.map(i => i.value), 1);
+    $: barScale = Math.max(barMaxV, 3); // alltid minst 3 som tak
     $: barChartItems = barStats.items.map((item, idx) => {
         const bw = 36, gap = 20;
         const x = idx * (bw + gap) + 24;
-        const bh = Math.max((item.value / barMaxV) * 70, 2);
+        const bh = Math.max((item.value / barScale) * 70, item.value > 0 ? 2 : 0);
         const y = 90 - bh;
         return { ...item, bw, x, bh, y };
     });
@@ -1192,7 +1194,7 @@
             </div>
         
             {#if visTeknikkSkjema}
-                <div class="teknikk-skjema bg-[var(--card)] rounded-2xl border border-[var(--br)] p-4 mb-4">
+                <div class="teknikk-skjema bg-[var(--card)] rounded-2xl border border-[var(--br)] p-4 mb-4" transition:fly={{ x: 300, duration: 250 }}>
                     <h3 class="font-bold text-sm text-[var(--p1)] mb-3">Logg ny teknikkøkt</h3>
         
                     <div class="flex flex-col gap-3">
@@ -1384,6 +1386,7 @@
             <!-- Stat Calendar Picker -->
             {#if showStatCalendar}
                 <div class="fixed inset-0 z-40 flex items-center justify-center pt-24 bg-slate-900/40 backdrop-blur-sm"
+                    transition:fly={{ x: 300, duration: 300 }}
                     on:click={() => showStatCalendar = false}
                     role="button" tabindex="0"
                     on:keydown={(e) => e.key === "Escape" && (showStatCalendar = false)} aria-label="Lukk">
@@ -1438,14 +1441,18 @@
                 <!-- BAR CHART -->
                 <div class="bg-[var(--card)] rounded-2xl border border-[var(--br)] p-4">
                     <svg viewBox="0 0 272 110" class="w-full pb-3">
-                        {#each [0.33, 0.66, 1] as frac}
+                        {#each [1/3, 2/3, 1] as frac}
+                            {@const scale = Math.max(barMaxV, 3)}
                             <line x1="18" y1={90 - frac * 70} x2="260" y2={90 - frac * 70} stroke="#E2E8F0" stroke-width="0.7"/>
-                            <text x="16" y={90 - frac * 70 + 2} font-size="6" fill="#94A3B8" text-anchor="end">{Math.round(frac * barMaxV)}</text>
+                            <text x="16" y={90 - frac * 70 + 2} font-size="6" fill="#94A3B8" text-anchor="end">{Math.round(frac * scale)}</text>
                         {/each}
                         {#each barChartItems as item}
-                            <rect x={item.x+1} y={item.y+1} width={item.bw} height={item.bh} fill="rgba(0,0,0,0.05)" rx="5"/>
-                            <rect x={item.x} y={item.y} width={item.bw} height={item.bh} fill={item.barColor} rx="5"/>
-                            <text x={item.x + item.bw/2} y={item.y - 3} text-anchor="middle" font-size="8" font-weight="700" fill={item.barColor}>{item.value}</text>
+                            <rect x={item.x+1} y={item.y+1} width={item.bw} height={item.bh} fill="rgba(0,0,0,0.05)" rx="5"
+                                style="transition: y 0.4s cubic-bezier(0.4,0,0.2,1), height 0.4s cubic-bezier(0.4,0,0.2,1);"/>
+                            <rect x={item.x} y={item.y} width={item.bw} height={item.bh} fill={item.barColor} rx="5"
+                                style="transition: y 0.4s cubic-bezier(0.4,0,0.2,1), height 0.4s cubic-bezier(0.4,0,0.2,1);"/>
+                            <text x={item.x + item.bw/2} y={item.y - 3} text-anchor="middle" font-size="8" font-weight="700" fill={item.barColor}
+                                style="transition: y 0.4s cubic-bezier(0.4,0,0.2,1);">{item.value}</text>
                             <text x={item.x + item.bw/2} y="106" text-anchor="middle" font-size="6.5" fill="#64748B" transform={`rotate(-28, ${item.x + item.bw/2}, 106)`}>{item.label}</text>
                         {/each}
                         <line x1="18" y1="90" x2="260" y2="90" stroke="#CBD5E1" stroke-width="0.8"/>
@@ -1738,7 +1745,8 @@
     {#if activeModal === "session" && selectedSessionGroup}
         <div class="fixed inset-0 z-50 flex items-end lg:items-center justify-center bg-slate-900/40 backdrop-blur-sm"
             on:click={() => activeModal = null} role="button" tabindex="0"
-            on:keydown={(e) => e.key === "Escape" && (activeModal = null)} aria-label="Lukk">
+            on:keydown={(e) => e.key === "Escape" && (activeModal = null)} aria-label="Lukk"
+            transition:fly={{ y: 300, duration: 300 }}>
             <div class="bg-[var(--card)] w-full lg:max-w-2xl lg:mx-auto lg:rounded-3xl rounded-t-3xl max-h-[88vh] min-h-[50vh] lg:min-h-0 overflow-y-auto lg:my-8"
                 use:swipeToDismiss
                 on:click|stopPropagation role="dialog" aria-modal="true">
@@ -2031,6 +2039,7 @@
     <!-- CALENDAR MODAL -->
     {#if activeModal === "calendar"}
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4"
+            transition:fly={{ y: -300, duration: 300 }}
             on:click={() => activeModal = null} role="button" tabindex="0"
             on:keydown={(e) => e.key === "Escape" && (activeModal = null)} aria-label="Lukk">
             <div class="bg-[var(--card)] w-full max-w-sm rounded-3xl p-5 shadow-2xl relative"
@@ -2101,6 +2110,7 @@
             role="button" tabindex="0"
             on:keydown={(e) => e.key === "Escape" && (activeModal = null)} aria-label="Lukk">
             <div class="bg-[var(--card)] h-full w-72 max-w-[85vw] shadow-2xl flex flex-col"
+                transition:fly={{ x: 300, duration: 300 }}
                 use:swipeToClose
                 on:click|stopPropagation role="dialog" aria-modal="true">
 
