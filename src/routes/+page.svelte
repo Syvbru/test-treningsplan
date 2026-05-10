@@ -1,6 +1,5 @@
 <script lang="ts">
-    import { PUBLIC_CLOUDINARY_CLOUD_NAME, PUBLIC_CLOUDINARY_UPLOAD_PRESET } from '$env/static/public';
-    import { tick } from "svelte";
+    import { tick, onMount } from "svelte";
     import { fly } from 'svelte/transition';
     import Papa from "papaparse";
     import {
@@ -202,7 +201,7 @@
     let today = startOfDay(new Date());
     let selectedDate: Date | null = null;
 
-    if (typeof window !== "undefined") {
+    onMount(() => {
         isLoading = true;
         fetch('/api/verify')
             .then(res => res.json())
@@ -225,7 +224,7 @@
                 isLoading = false;
             })
             .catch(() => { isLoading = false; });
-    }
+    });
 
     async function handleLogin() {
         loginError = ""; isLoading = true;
@@ -288,7 +287,7 @@
             const csvText = await res.text();
             Papa.parse(csvText, {
                 header: false, skipEmptyLines: true,
-                complete: (result) => {
+                complete: (result: any) => {
                     const rows = result.data as string[][];
                     if (rows.length < 2) return;
                     const header = rows[0].map(h => h.trim().toLowerCase());
@@ -321,7 +320,7 @@
             const csvText = await res.text();
             Papa.parse(csvText, {
                 header: true, skipEmptyLines: true,
-                complete: (result) => {
+                complete: (result: any) => {
                     const rows = result.data as any[];
                     const parsed: typeof fellesOkter = [];
                     rows.forEach(row => {
@@ -945,9 +944,9 @@
         }
     }
 
-    let playingIndex = null;
+    let playingIndex: number | null = null;
 
-    function handlePlay(i) {
+    function handlePlay(i: number) {
         playingIndex = i;
     }
 
@@ -1161,6 +1160,10 @@
                                         {:else}
                                             <span></span>
                                         {/if}
+                                    </div>
+                                {:else if hasComment}
+                                    <div class="flex justify-end w-full pt-1.5 mt-3 border-t {isT ? 'text-[var(--p1)]' : 'text-[var(--p2)]'}">
+                                        <MessageSquare class="h-3.5 w-3.5" />
                                     </div>
                                 {/if}
                             {:else}
@@ -1391,7 +1394,8 @@
                     role="button" tabindex="0"
                     on:keydown={(e) => e.key === "Escape" && (showStatCalendar = false)} aria-label="Lukk">
                     <div class="bg-[var(--card)] w-full max-w-xs rounded-3xl p-5 shadow-2xl"
-                        on:click|stopPropagation role="dialog" aria-modal="true">
+                        on:click|stopPropagation on:keydown|stopPropagation
+                        role="dialog" aria-modal="true" tabindex="-1">
                         <div class="flex justify-end mb-2">
                             <button on:click={() => showStatCalendar = false}
                                 class="bg-[var(--surface)] hover:bg-[var(--surface)]/50 rounded-lg p-1.5 text-[var(--text2)] transition-colors">
@@ -1467,7 +1471,11 @@
                 <!-- LINE CHART -->
                 <div class="bg-[var(--card)] rounded-2xl border border-[var(--br)] p-4">
                     {#if lineChartData.length > 1}
+                        <!-- svelte-ignore a11y_no_static_element_interactions -->
+                        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+                        <!-- svelte-ignore a11y_click_events_have_key_events -->
                         <svg viewBox="0 0 272 110" class="w-full"
+                            role="img" aria-label="Treningstimer per dag"
                             on:mouseleave={() => lineTooltip = null}
                             on:click={() => lineTooltip = null}>
                             <defs>
@@ -1485,6 +1493,8 @@
                             <polyline points={linePoly} fill="none" stroke="var(--p1)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
                             {#each linePts as p}
                                 <!-- Invisible wider hit area -->
+                                <!-- svelte-ignore a11y_no_static_element_interactions -->
+                                <!-- svelte-ignore a11y_click_events_have_key_events -->
                                 <circle cx={p.x} cy={p.y} r="10" fill="transparent"
                                     on:mouseenter={() => lineTooltip = p}
                                     on:mouseleave={() => lineTooltip = null}
@@ -1749,7 +1759,8 @@
             transition:fly={{ y: 300, duration: 300 }}>
             <div class="bg-[var(--card)] w-full lg:max-w-2xl lg:mx-auto lg:rounded-3xl rounded-t-3xl max-h-[88vh] min-h-[50vh] lg:min-h-0 overflow-y-auto lg:my-8"
                 use:swipeToDismiss
-                on:click|stopPropagation role="dialog" aria-modal="true">
+                on:click|stopPropagation on:keydown|stopPropagation
+                role="dialog" aria-modal="true" tabindex="-1">
                 <div class="max-w-lg mx-auto lg:max-w-none p-5 pb-8 relative">
 
                 <!-- Drag handle (synlig på mobil og nettbrett) -->
@@ -1847,14 +1858,15 @@
             
             <div class="bg-[var(--card)] w-full lg:max-w-2xl lg:mx-auto lg:rounded-3xl rounded-t-3xl flex flex-col max-h-[82vh] lg:max-h-[88vh] lg:my-8"
                 use:swipeToDismiss
-                on:click|stopPropagation role="dialog" aria-modal="true">
+                on:click|stopPropagation on:keydown|stopPropagation
+                role="dialog" aria-modal="true" tabindex="-1">
                 
                 <div class="flex-shrink-0 pt-4 px-5 pb-4 max-w-lg mx-auto w-full lg:max-w-none">
                     <div class="lg:hidden flex justify-center mb-5">
                         <div class="w-16 h-[5px] rounded-full bg-slate-300"></div>
                     </div>
     
-                    {#if redigerLogg?.id === selectedTeknikkLogg.id}
+                    {#if redigerLogg?.id === selectedTeknikkLogg?.id}
                         <p class="font-bold text-lg text-[var(--p1)]">Rediger logg</p>
                     {:else}
                         <div class="flex items-start justify-between gap-2">
@@ -1868,11 +1880,11 @@
                             </div>
                             <div class="flex gap-1 flex-shrink-0">
                                 {#if !isAdmin}
-                                    <button on:click={() => startRediger(selectedTeknikkLogg)}
+                                    <button on:click={() => selectedTeknikkLogg && startRediger(selectedTeknikkLogg)}
                                         class="bg-[var(--surface)] hover:bg-[var(--surface)]/50 rounded-lg p-1.5 text-[var(--text2)] transition-colors">
                                         <SquarePen class="h-5 w-5" />
                                     </button>
-                                    <button on:click={async () => { await slettTeknikklogg(selectedTeknikkLogg.id); activeModal = null; }}
+                                    <button on:click={async () => { if (selectedTeknikkLogg) { await slettTeknikklogg(selectedTeknikkLogg.id); activeModal = null; } }}
                                         class="bg-[var(--surface)] hover:bg-red-400/50 rounded-lg p-1.5 text-[var(--text2)] hover:text-red-500 transition-colors">
                                         <Trash2 class="h-5 w-5" />
                                     </button>
@@ -1887,7 +1899,7 @@
                 </div>
 
                 <div class="flex-1 overflow-y-auto p-5 pb-8 max-w-lg mx-auto w-full lg:max-w-none">
-                    {#if redigerLogg?.id === selectedTeknikkLogg.id}
+                    {#if redigerLogg?.id === selectedTeknikkLogg?.id}
                         <div class="teknikk-skjema flex flex-col gap-3">
                             <div class="w-full min-w-0 overflow-hidden mb-3">
                                 <label for="rediger-dato" class="block text-xs font-semibold text-[var(--text2)] uppercase tracking-widest mb-1">Dato</label>
@@ -2014,6 +2026,7 @@
                             <div class="flex flex-col gap-3 mt-2">
                                 {#each selectedTeknikkLogg.video_urls as url, i}
                                     <div class="rounded-xl overflow-hidden border border-[var(--br)]">
+                                        <!-- svelte-ignore a11y_media_has_caption -->
                                         <video
                                             src={url}
                                             controls
@@ -2043,7 +2056,8 @@
             on:click={() => activeModal = null} role="button" tabindex="0"
             on:keydown={(e) => e.key === "Escape" && (activeModal = null)} aria-label="Lukk">
             <div class="bg-[var(--card)] w-full max-w-sm rounded-3xl p-5 shadow-2xl relative"
-                on:click|stopPropagation role="dialog" aria-modal="true">
+                on:click|stopPropagation on:keydown|stopPropagation
+                role="dialog" aria-modal="true" tabindex="-1">
 
                 <!-- X close button – above month navigation -->
                 <div class="flex justify-end mb-2">
@@ -2112,7 +2126,8 @@
             <div class="bg-[var(--card)] h-full w-72 max-w-[85vw] shadow-2xl flex flex-col"
                 transition:fly={{ x: 300, duration: 300 }}
                 use:swipeToClose
-                on:click|stopPropagation role="dialog" aria-modal="true">
+                on:click|stopPropagation on:keydown|stopPropagation
+                role="dialog" aria-modal="true" tabindex="-1">
 
                 <div class="bg-[var(--p1)] px-5 py-6 flex items-center gap-3">
                     <div class="w-8 h-8 rounded-full bg-[var(--card)]/40 flex items-center justify-center flex-shrink-0">
