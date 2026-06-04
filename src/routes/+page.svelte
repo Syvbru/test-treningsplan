@@ -1,5 +1,4 @@
 <script lang="ts">
-    import { PUBLIC_CLOUDINARY_CLOUD_NAME, PUBLIC_CLOUDINARY_UPLOAD_PRESET } from '$env/static/public';
     import { tick, onMount } from "svelte";
     import { fly } from 'svelte/transition';
     import Papa from "papaparse";
@@ -1091,7 +1090,7 @@
     {#if visPeriodeVarsel && !isAdmin}
         <div class="fixed top-0 left-0 right-0 z-[100] shadow-lg"
              style="background-color:#7f1d1d; color:#fecaca;">
-            <div class="mx-auto max-w-5xl px-4 py-4">
+            <div class="mx-auto max-w-5xl p-4 m-4">
                 <div class="flex items-center gap-3">
                     <p class="flex-1 font-bold text-sm">Vennligst fullfør skissen for neste periodeplan</p>
                     <button on:click={() => visPeriodeVarsel = false}
