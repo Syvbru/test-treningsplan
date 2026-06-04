@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { PUBLIC_CLOUDINARY_CLOUD_NAME, PUBLIC_CLOUDINARY_UPLOAD_PRESET } from '$env/static/public';
     import { tick, onMount } from "svelte";
     import { fly } from 'svelte/transition';
     import Papa from "papaparse";
@@ -201,6 +202,64 @@
     let today = startOfDay(new Date());
     let selectedDate: Date | null = null;
 
+    // ── PERIODE-PLAN STATUS ───────────────────────────────────────────────────────
+    let periodePlanStatus: "JA" | "NEI" | null = null;
+
+    const PERIODER: { fra: string; til: string; ark: string }[] = [
+        { fra: "2026-05-29", til: "2026-06-11", ark: "Uke 24-28 26/27" },
+        { fra: "2026-06-03", til: "2026-06-16", ark: "Uke 29-33 26/27" },
+        { fra: "2026-08-07", til: "2026-08-20", ark: "Uke 34-38 26/27" },
+        { fra: "2026-09-11", til: "2026-09-24", ark: "Uke 39-43 26/27" },
+        { fra: "2026-10-16", til: "2026-10-29", ark: "Uke 44-49 26/27" },
+        { fra: "2026-11-27", til: "2026-12-10", ark: "Uke 50-1 26/27" },
+        { fra: "2027-01-01", til: "2027-01-14", ark: "Uke 2-5 26/27" },
+        { fra: "2027-01-29", til: "2027-02-11", ark: "Uke 6-11 26/27" },
+    ];
+
+    function getAktivArkNavn(): string | null {
+        const now = startOfDay(new Date());
+        for (const p of PERIODER) {
+            if (isWithinInterval(now, { start: parseISO(p.fra), end: parseISO(p.til) })) {
+                return p.ark;
+            }
+        }
+        return null;
+    }
+
+    async function lastPeriodePlanStatus(editPlanSheetUrl: string) {
+        const arkNavn = getAktivArkNavn();
+        if (!arkNavn) { periodePlanStatus = null; return; }
+        const match = editPlanSheetUrl.match(/\/spreadsheets\/d\/([^/]+)/);
+        if (!match) { periodePlanStatus = null; return; }
+        const spreadsheetId = match[1];
+        const ark = arkNavn.replace(/ /g, "%20");
+        const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=${ark}`;
+        try {
+            const res = await fetch(url);
+            const text = await res.text();
+            const rows = Papa.parse(text, { header: false }).data as string[][];
+            for (const row of rows) {
+                for (let c = 0; c < row.length; c++) {
+                    if (row[c]?.trim().toUpperCase() === "MIN PLAN ER KLAR FOR Å FERDIGSTILLES") {
+                        const val = row[c + 1]?.trim().toUpperCase();
+                        periodePlanStatus = val === "JA" ? "JA" : "NEI";
+                        if (periodePlanStatus === "NEI") sendPeriodePlanVarsel();
+                        return;
+                    }
+                }
+            }
+            periodePlanStatus = null;
+        } catch {
+            periodePlanStatus = null;
+        }
+    }
+
+    let visPeriodeVarsel = false;
+
+    function sendPeriodePlanVarsel() {
+        visPeriodeVarsel = true;
+    }
+
     onMount(() => {
         isLoading = true;
         fetch('/api/verify')
@@ -218,6 +277,7 @@
                         }
                     } else {
                         await Promise.all([loadWorkoutPlan(data.sheetUrl), loadFellesOkter(), hentTeknikk()]);
+                        if (data.editPlanSheet) lastPeriodePlanStatus(data.editPlanSheet);
                         await tick(); scrollToAnchor();
                     }
                 }
@@ -240,6 +300,7 @@
                 currentEditPlanSheet = data.editPlanSheet || "";
                 if (!data.isAdmin) {
                     await Promise.all([loadWorkoutPlan(data.sheetUrl), loadFellesOkter(), hentTeknikk()]);
+                    if (data.editPlanSheet) lastPeriodePlanStatus(data.editPlanSheet);
                     await tick(); scrollToAnchor();
                 }
             } else { loginError = data.error || "Innlogging feilet."; }
@@ -263,6 +324,7 @@
                 currentUtoverNavn = data.searchName;
                 currentEditPlanSheet = data.editPlanSheet || "";
                 await Promise.all([loadWorkoutPlan(data.sheetUrl), loadFellesOkter(), hentTeknikk()]);
+                if (data.editPlanSheet) lastPeriodePlanStatus(data.editPlanSheet);
                 selectedDate = null; selectedSessionGroup = null;
                 cardAnchor = startOfDay(new Date()); cardBackDays = 7; cardForwardDays = 7;
                 await tick(); scrollToAnchor();
@@ -276,7 +338,7 @@
         loggedIn = false; username = ""; password = ""; loginError = "";
         isLoading = false; isAdmin = false; currentUtoverNavn = ""; currentEditPlanSheet = "";
         workouts = []; fellesOkter = []; expandedDates.clear();
-        teknikkLogger = [];
+        teknikkLogger = []; periodePlanStatus = null;
         selectedDate = null; selectedSessionGroup = null; activeModal = null;
     }
 
@@ -1025,6 +1087,24 @@
 {#if loggedIn}
 <div class="min-h-screen {darkMode?'dk':'lt'}" style="background-color:var(--bg)">
 
+    <!-- PERIODE-PLAN VARSEL -->
+    {#if visPeriodeVarsel && !isAdmin}
+        <div class="fixed top-0 left-0 right-0 z-[100] shadow-lg"
+             style="background-color:#7f1d1d; color:#fecaca;">
+            <div class="mx-auto max-w-5xl px-4 py-4">
+                <div class="flex items-center gap-3">
+                    <p class="flex-1 font-bold text-sm">Vennligst fullfør skissen for neste periodeplan</p>
+                    <button on:click={() => visPeriodeVarsel = false}
+                        class="flex-shrink-0 p-1 rounded hover:bg-white/10 transition-colors"
+                        aria-label="Lukk varsel">
+                        <X class="h-5 w-5" />
+                    </button>
+                </div>
+                <p class="text-xs mt-1 opacity-90">For å fjerne dette varselet må du ferdigstille skissen din og endre feltet "min plan er klar til å ferdigstilles" i bunn av regnearket til "JA".</p>
+            </div>
+        </div>
+    {/if}
+
     <!-- HEADER -->
     <header class="sticky top-0 z-50" style="background-color:var(--bg)">
         <div class="mx-auto max-w-5xl px-4 pt-5 pb-2">
@@ -1072,6 +1152,22 @@
 
     <!-- MAIN -->
     <main class="mx-auto max-w-5xl px-4 py-6 space-y-8">
+
+        <!-- PERIODE-PLAN STATUS -->
+        {#if periodePlanStatus !== null}
+            <div class="rounded-xl px-2 py-1 flex items-center gap-3 text-sm font-semibold
+                {periodePlanStatus === 'JA'
+                    ? 'bg-green-500/15 border border-green-500/40 text-green-400'
+                    : 'bg-red-500/15 border border-red-500/40 text-red-400'}">
+                <span class="inline-block w-2 h-2 rounded-full flex-shrink-0
+                    {periodePlanStatus === 'JA' ? 'bg-green-500' : 'bg-red-500'}"></span>
+                <span class="text-xs">
+                    {periodePlanStatus === 'JA'
+                        ? 'Neste periodeplan klar for å ferdigstilles'
+                        : 'Neste periodeplan ikke klar for å ferdigstilles'}
+                </span>
+            </div>
+        {/if}
 
         <!-- MINE TRENINGSØKTER -->
         <section>
