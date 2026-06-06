@@ -23,6 +23,8 @@
     let isAdmin = false;
     let currentUtoverNavn = "";
     let currentEditPlanSheet = "";
+    let utoverListe: string[] = [];
+    let utoverStatus = new Map<string, "JA" | "NEI">();
 
     type ModalType = "session" | "calendar" | "profile" | "teknikk" | null;
     let activeModal: ModalType = null;
@@ -270,6 +272,7 @@
                     username = data.username || "";
                     currentEditPlanSheet = data.editPlanSheet || "";
                     if (data.isAdmin) {
+                        await lastUtoverListe();
                         if (data.lastSearchName) {
                             currentUtoverNavn = data.lastSearchName;
                             await searchUtoverByName();
@@ -297,7 +300,9 @@
             if (data.success) {
                 loggedIn = true; isAdmin = data.isAdmin; username = data.username;
                 currentEditPlanSheet = data.editPlanSheet || "";
-                if (!data.isAdmin) {
+                if (data.isAdmin) {
+                    await lastUtoverListe();
+                } else {
                     await Promise.all([loadWorkoutPlan(data.sheetUrl), loadFellesOkter(), hentTeknikk()]);
                     if (data.editPlanSheet) lastPeriodePlanStatus(data.editPlanSheet);
                     await tick(); scrollToAnchor();
@@ -305,6 +310,58 @@
             } else { loginError = data.error || "Innlogging feilet."; }
         } catch { loginError = "Kunne ikke koble til server."; }
         finally { isLoading = false; }
+    }
+
+    async function sjekkPlanStatusForBruker(name: string, editPlanSheetUrl: string): Promise<"JA" | "NEI" | null> {
+        const arkNavn = getAktivArkNavn();
+        if (!arkNavn) return null;
+        const match = editPlanSheetUrl.match(/\/spreadsheets\/d\/([^/]+)/);
+        if (!match) return null;
+        const spreadsheetId = match[1];
+        const ark = arkNavn.replace(/ /g, "%20");
+        const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=${ark}`;
+        try {
+            const res = await fetch(url);
+            const text = await res.text();
+            const rows = Papa.parse(text, { header: false }).data as string[][];
+            for (const row of rows) {
+                for (let c = 0; c < row.length; c++) {
+                    if (row[c]?.trim().toUpperCase() === "MIN PLAN ER KLAR FOR Å FERDIGSTILLES") {
+                        return row[c + 1]?.trim().toUpperCase() === "JA" ? "JA" : "NEI";
+                    }
+                }
+            }
+            return null;
+        } catch {
+            return null;
+        }
+    }
+
+    async function sjekkAlleUtoverStatus() {
+        try {
+            const res = await fetch('/api/admin-user-sheets');
+            const data = await res.json();
+            if (!data.success) return;
+            await Promise.all(
+                data.users.map(async (u: { name: string; editPlanSheet: string }) => {
+                    const status = await sjekkPlanStatusForBruker(u.name, u.editPlanSheet);
+                    if (status !== null) {
+                        utoverStatus = new Map(utoverStatus).set(u.name, status);
+                    }
+                })
+            );
+        } catch {}
+    }
+
+    async function lastUtoverListe() {
+        try {
+            const res = await fetch('/api/admin-list-users');
+            const data = await res.json();
+            if (data.success) {
+                utoverListe = data.names;
+                sjekkAlleUtoverStatus();
+            }
+        } catch {}
     }
 
     async function searchUtoverByName() {
@@ -1132,15 +1189,21 @@
             </div>
 
             {#if isAdmin}
-                <div class="mt-3 flex gap-2">
-                    <input type="text" bind:value={currentUtoverNavn}
-                        on:keydown={(e) => { if (e.key === "Enter") searchUtoverByName(); }}
-                        placeholder="Søk etter utøver…"
-                        class="flex-1 rounded-full border px-4 py-2 text-sm focus:ring-2 focus:ring-[color:var(--p1)] outline-none transition bg-[var(--card)] border-[var(--p1)/40] text-[var(--p1)] placeholder-[color:var(--p1)/50]" />
-                    <button on:click={searchUtoverByName} disabled={isLoading || !currentUtoverNavn.trim()}
-                        class="rounded-full px-4 py-2 text-sm font-semibold transition disabled:opacity-50 bg-[var(--p1)] hover:bg-[var(--p1)]/80 text-[var(--card)]">
-                        {isLoading ? "…" : "Søk"}
-                    </button>
+                <div class="mt-3">
+                    <select
+                        bind:value={currentUtoverNavn}
+                        on:change={searchUtoverByName}
+                        disabled={isLoading || utoverListe.length === 0}
+                        class="w-full rounded-full border px-4 py-2 text-sm focus:ring-2 focus:ring-[color:var(--p1)] outline-none transition bg-[var(--card)] border-[var(--p1)/40] text-[var(--p1)] disabled:opacity-50">
+                        <option value="">— Velg utøver —</option>
+                        {#each utoverListe as namn}
+                            <option value={namn}>
+                                {utoverStatus.has(namn)
+                                    ? (utoverStatus.get(namn) === 'JA' ? '🟢 ' : '🔴 ')
+                                    : ''}{namn}
+                            </option>
+                        {/each}
+                    </select>
                 </div>
                 {#if loginError}
                     <div class="mt-2 rounded-lg bg-red-500/80 text-white text-sm px-3 py-2">{loginError}</div>
