@@ -1088,13 +1088,13 @@
     :global(.dk .teknikk-skjema input),
     :global(.dk .teknikk-skjema select),
     :global(.dk .teknikk-skjema textarea),
-    :global(.dk .teknikk-skjema p),
+    :global(.dk .teknikk-skjema p:not(.feilmelding)),
     :global(.dk .teknikk-skjema label) {color: #F1F5F9 !important;}
     /* Inputskjema teknikk i lysmodus */
     :global(.lt .teknikk-skjema input),
     :global(.lt .teknikk-skjema select),
     :global(.lt .teknikk-skjema textarea),
-    :global(.lt .teknikk-skjema p),
+    :global(.lt .teknikk-skjema p:not(.feilmelding)),
     :global(.lt .teknikk-skjema label) {color: #64748B !important;}
 </style>
 
@@ -2154,7 +2154,7 @@
                             {/if}
 
                             {#if redigerFeil}
-                                <p class="text-sm text-red-600 bg-red-50 rounded-xl px-3 py-2">{redigerFeil}</p>
+                                <p class="feilmelding text-sm text-red-600 bg-red-100 rounded-xl px-3 py-2">{redigerFeil}</p>
                             {/if}
  
                             <div class="flex gap-2">
