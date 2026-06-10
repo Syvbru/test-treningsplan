@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { PUBLIC_CLOUDINARY_CLOUD_NAME, PUBLIC_CLOUDINARY_UPLOAD_PRESET } from '$env/static/public';
     import { tick, onMount } from "svelte";
     import { fly } from 'svelte/transition';
     import Papa from "papaparse";
