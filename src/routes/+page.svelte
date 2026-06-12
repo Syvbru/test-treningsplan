@@ -230,9 +230,9 @@
 
     async function lastPeriodePlanStatus(editPlanSheetUrl: string) {
         const arkNavn = getAktivArkNavn();
-        if (!arkNavn) { periodePlanStatus = null; return; }
+        if (!arkNavn) { periodePlanStatus = null; visPeriodeVarsel = false; return; }
         const match = editPlanSheetUrl.match(/\/spreadsheets\/d\/([^/]+)/);
-        if (!match) { periodePlanStatus = null; return; }
+        if (!match) { periodePlanStatus = null; visPeriodeVarsel = false; return; }
         const spreadsheetId = match[1];
         const ark = arkNavn.replace(/ /g, "%20");
         const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=${ark}`;
@@ -250,9 +250,9 @@
                     }
                 }
             }
-            periodePlanStatus = null;
+            periodePlanStatus = null; visPeriodeVarsel = false;
         } catch {
-            periodePlanStatus = null;
+            periodePlanStatus = null; visPeriodeVarsel = false;
         }
     }
 
@@ -395,7 +395,7 @@
         loggedIn = false; username = ""; password = ""; loginError = "";
         isLoading = false; isAdmin = false; currentUtoverNavn = ""; currentEditPlanSheet = "";
         workouts = []; fellesOkter = []; expandedDates.clear();
-        teknikkLogger = []; periodePlanStatus = null;
+        teknikkLogger = []; periodePlanStatus = null; visPeriodeVarsel = false;
         selectedDate = null; selectedSessionGroup = null; activeModal = null;
     }
 
