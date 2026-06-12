@@ -209,7 +209,7 @@
 
     const PERIODER: { fra: string; til: string; ark: string }[] = [
         { fra: "2026-05-29", til: "2026-06-11", ark: "Uke 24-28 26/27" },
-        { fra: "2026-06-03", til: "2026-06-16", ark: "Uke 29-33 26/27" },
+        { fra: "2026-07-03", til: "2026-07-16", ark: "Uke 29-33 26/27" },
         { fra: "2026-08-07", til: "2026-08-20", ark: "Uke 34-38 26/27" },
         { fra: "2026-09-11", til: "2026-09-24", ark: "Uke 39-43 26/27" },
         { fra: "2026-10-16", til: "2026-10-29", ark: "Uke 44-49 26/27" },
@@ -230,9 +230,9 @@
 
     async function lastPeriodePlanStatus(editPlanSheetUrl: string) {
         const arkNavn = getAktivArkNavn();
-        if (!arkNavn) { periodePlanStatus = null; visPeriodeVarsel = false; return; }
+        if (!arkNavn) { periodePlanStatus = null; return; }
         const match = editPlanSheetUrl.match(/\/spreadsheets\/d\/([^/]+)/);
-        if (!match) { periodePlanStatus = null; visPeriodeVarsel = false; return; }
+        if (!match) { periodePlanStatus = null; return; }
         const spreadsheetId = match[1];
         const ark = arkNavn.replace(/ /g, "%20");
         const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=${ark}`;
@@ -250,9 +250,9 @@
                     }
                 }
             }
-            periodePlanStatus = null; visPeriodeVarsel = false;
+            periodePlanStatus = null;
         } catch {
-            periodePlanStatus = null; visPeriodeVarsel = false;
+            periodePlanStatus = null;
         }
     }
 
@@ -395,7 +395,7 @@
         loggedIn = false; username = ""; password = ""; loginError = "";
         isLoading = false; isAdmin = false; currentUtoverNavn = ""; currentEditPlanSheet = "";
         workouts = []; fellesOkter = []; expandedDates.clear();
-        teknikkLogger = []; periodePlanStatus = null; visPeriodeVarsel = false;
+        teknikkLogger = []; periodePlanStatus = null;
         selectedDate = null; selectedSessionGroup = null; activeModal = null;
     }
 
