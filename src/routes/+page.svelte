@@ -501,7 +501,7 @@
     // ─────────────────────────────────────────────────────────────────────────────
     function getWorkoutInfo(title: string, dark: boolean = false) {
         const lower = title.toLowerCase();
-        const isHard = lower.includes("motbakkeløp") || lower.includes("sprint") || lower.includes("sprintøkt") || lower.includes("distanseøkt") || /(rennet|(?<!lang)renn(?!forbered))/u.test(lower) || lower.includes("dsv-cup") || lower.includes("km ") || lower.includes(" km") || lower.includes("birken") || lower.includes("klubbmesterskap") || lower.includes("skifestival") || lower.includes("vestmarka opp") || lower.includes("gjelleråsbakken") || lower.includes("askerspurten") || lower.includes("oslo marat") || lower.includes("terrengløp")|| lower.includes("10 for grete") || lower.includes("kong harald") || lower.includes("nm stafett") || lower.includes("rulleskicup");
+        const isHard = lower.includes("motbakkeløp") || lower.includes("sprint") || lower.includes("sprintøkt") || lower.includes("distanseøkt") || /(rennet|(?<!lang)renn(?!forbered))/u.test(lower) || lower.includes("dsv-cup") || lower.includes("km ") || lower.includes(" km") || lower.includes("birken") || lower.includes("klubbmesterskap") || lower.includes("skifestival") || lower.includes("vestmarka opp") || lower.includes("gjelleråsbakken") || lower.includes("askerspurten") || lower.includes("oslo marat") || lower.includes("terrengløp")|| lower.includes("10 for grete") || lower.includes("kong harald") || lower.includes("nm stafett") || lower.includes("rulleskicup") || lower.includes("Swix/Foss sport");
         if (lower.includes("intervall") || isHard)
             return { icon: Timer, color: "text-red-600", bg: "bg-red-100", hex: "#B91C1C", hexBg: "#FEF2F2", darkBg: "bg-red-500" };
         if (lower.includes("hvile"))
@@ -542,7 +542,7 @@
         // Renn-logic
         const isTest = lower.includes("motbakkeløp") || lower.includes("sprintøkt") || lower.includes("distanseøkt");
         if (isTest) return "Test";
-        const isRenn =  lower.includes("sprint") || /(rennet|(?<!lang)renn(?!forbered))/u.test(lower) || lower.includes("dsv-cup") || lower.includes("km ") || lower.includes(" km") || lower.includes("birken") || lower.includes("klubbmesterskap") || lower.includes("skifestival") || lower.includes("vestmarka opp") || lower.includes("gjelleråsbakken") || lower.includes("kong harald");
+        const isRenn =  lower.includes("sprint") || /(rennet|(?<!lang)renn(?!forbered))/u.test(lower) || lower.includes("dsv-cup") || lower.includes("km ") || lower.includes(" km") || lower.includes("birken") || lower.includes("klubbmesterskap") || lower.includes("skifestival") || lower.includes("vestmarka opp") || lower.includes("gjelleråsbakken") || lower.includes("kong harald") || lower.includes("nm stafett") || lower.includes("rulleskicup") || lower.includes("Swix/Foss sport");
         if (isRenn) return "Renn";
         const isHardokt = lower.includes("oslo marat") || lower.includes("terrengløp") || lower.includes("10 for grete") || lower.includes("askerspurten");
         if (isHardokt) return "Hardøkt";
@@ -625,7 +625,7 @@
             else if (lower.includes("styrke") || lower.includes("basis")) styrke++;
             else if (lower.includes("langtur")) langtur++;
             else {
-                const isH = lower.includes("intervall") || lower.includes("motbakkeløp") || lower.includes("sprint") || lower.includes("distanseøkt") || /(rennet|(?<!lang)renn(?!forbered))/u.test(lower) || lower.includes("dsv-cup") || lower.includes("km ") || lower.includes(" km") || lower.includes("birken") || lower.includes("klubbmesterskap") || lower.includes("skifestival") || lower.includes("vestmarka opp") || lower.includes("gjelleråsbakken") || lower.includes("askerspurten") || lower.includes("oslo marat") || lower.includes("terrengløp") || lower.includes("10 for grete") || lower.includes("kong harald");
+                const isH = lower.includes("intervall") || lower.includes("motbakkeløp") || lower.includes("sprint") || lower.includes("distanseøkt") || /(rennet|(?<!lang)renn(?!forbered))/u.test(lower) || lower.includes("dsv-cup") || lower.includes("km ") || lower.includes(" km") || lower.includes("birken") || lower.includes("klubbmesterskap") || lower.includes("skifestival") || lower.includes("vestmarka opp") || lower.includes("gjelleråsbakken") || lower.includes("askerspurten") || lower.includes("oslo marat") || lower.includes("terrengløp") || lower.includes("10 for grete") || lower.includes("kong harald") || lower.includes("nm stafett") || lower.includes("rulleskicup") || lower.includes("Swix/Foss sport");
                 if (isH) hard++;
             }
         });
