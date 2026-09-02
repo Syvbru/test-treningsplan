@@ -1668,7 +1668,7 @@
                                 style="transition: y 0.4s cubic-bezier(0.4,0,0.2,1), height 0.4s cubic-bezier(0.4,0,0.2,1);"/>
                             <text x={item.x + item.bw/2} y={item.y - 3} text-anchor="middle" font-size="8" font-weight="700" fill={item.barColor}
                                 style="transition: y 0.4s cubic-bezier(0.4,0,0.2,1);">{item.value}</text>
-                            <text x={item.x + item.bw/2} y="106" text-anchor="middle" font-size="6.5" fill="#64748B" transform={`rotate(-28, ${item.x + item.bw/2}, 106)`}>{item.label}</text>
+                            <text x={item.x + item.bw/2} y="106" text-anchor="middle" font-size="6.5" fill="#64748B">{item.label}</text>
                         {/each}
                         <line x1="18" y1="90" x2="260" y2="90" stroke="#CBD5E1" stroke-width="0.8"/>
                     </svg>
