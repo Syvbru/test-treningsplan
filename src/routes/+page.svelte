@@ -836,6 +836,49 @@
     }
     // ── SLUTT: YOUTUBE FACADE ────────────────────────────────────────────────────
 
+    // ── TEKNIKKVIDEOER (datastruktur) ────────────────────────────────────────────
+    type TeknikkVideo = {
+        url: string;               // YouTube video-ID
+        stilart: "Skate" | "Klassisk";
+        teknikk: string;           // f.eks. "Diagonal", "Staking", "Dobbeldans", "Padling"
+    };
+
+    // Legg til / fjern videoer her – visningen under bygges automatisk med #each
+    const teknikkVideoer: TeknikkVideo[] = [
+        { url: "Z2oNfG4eulQ", stilart: "Klassisk", teknikk: "Diagonal" },
+        { url: "NNR6YpFA7Jw", stilart: "Klassisk", teknikk: "Diagonal" },
+        { url: "D_hlp-buPhA", stilart: "Klassisk", teknikk: "Staking" },
+        { url: "MYVK4agNPcE", stilart: "Klassisk", teknikk: "Staking" },
+        { url: "7SZn1vDG_WY", stilart: "Klassisk", teknikk: "Dobbeltak med fraspark" },
+        { url: "PlFkOEr7bw0", stilart: "Skate", teknikk: "Dobbeldans" },
+        { url: "G-vIb6gzYRk", stilart: "Skate", teknikk: "Dobbeldans" },
+        { url: "Z6ynMU7KixA", stilart: "Skate", teknikk: "Padling" },
+        { url: "-eWpFQ9rDos", stilart: "Skate", teknikk: "Padling" },
+        { url: "8PLC-KWs4c0", stilart: "Skate", teknikk: "Enkeldans" },
+        { url: "QWZp2WVukkY", stilart: "Skate", teknikk: "Enkeldans" },
+    ];
+
+    let teknikkScrollEl: HTMLDivElement;
+    let teknikkAktivIndeks = 0;
+
+    function scrollTeknikkTil(index: number) {
+        if (!teknikkScrollEl) return;
+        const bredde = teknikkScrollEl.clientWidth;
+        teknikkScrollEl.scrollTo({ left: index * bredde, behavior: "smooth" });
+    }
+    function teknikkForrige() {
+        if (teknikkAktivIndeks > 0) scrollTeknikkTil(teknikkAktivIndeks - 1);
+    }
+    function teknikkNeste() {
+        if (teknikkAktivIndeks < teknikkVideoer.length - 1) scrollTeknikkTil(teknikkAktivIndeks + 1);
+    }
+    function onTeknikkScroll() {
+        if (!teknikkScrollEl) return;
+        const bredde = teknikkScrollEl.clientWidth;
+        teknikkAktivIndeks = bredde ? Math.round(teknikkScrollEl.scrollLeft / bredde) : 0;
+    }
+    // ── SLUTT: TEKNIKKVIDEOER ────────────────────────────────────────────────────
+
     // ── TEKNIKKLOGG ──────────────────────────────────────────────────────────────
     type TeknikkLogg = {
         id: number;
@@ -1097,6 +1140,15 @@
     :global(.lt .teknikk-skjema textarea),
     :global(.lt .teknikk-skjema p:not(.feilmelding)),
     :global(.lt .teknikk-skjema label) {color: #64748B !important;}
+
+    /* Skjuler scrollbar på teknikkvideo-karusellen (sveip sidelengs) */
+    .no-scrollbar {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+    .no-scrollbar::-webkit-scrollbar {
+        display: none;
+    }
 </style>
 
 {#if !loggedIn}
@@ -1168,7 +1220,7 @@
             <div class="flex justify-between items-end">
                 <div>
                     <p class="text-xs font-semibold tracking-widest text-[var(--p1)] uppercase mb-0.5">
-                        {format(activeDate, "EEEE d. MMMM", { locale: nb })}
+                        {format(today, "EEEE d. MMMM", { locale: nb })}
                     </p>
                     <h1 class="text-3xl md:text-4xl font-bold italic leading-none tracking-tight">
                         <span class="text-[var(--p2)]">TRENINGS</span><span class="text-[var(--p1)]">PLAN</span>
@@ -1695,216 +1747,66 @@
         <section>
             <h2 class="text-base font-bold text-[var(--p1)] mb-3">Teknikkvideoer:</h2>
 
-            <div class="flex flex-col gap-3">
+            <div class="flex items-center gap-2 md:gap-4">
+                <!-- Venstre pil: ligger utenfor videoen på stor skjerm, ikke over den -->
+                {#if teknikkVideoer.length > 1}
+                    <button type="button" on:click={teknikkForrige} disabled={teknikkAktivIndeks === 0}
+                        aria-label="Forrige video"
+                        class="hidden sm:flex flex-shrink-0 items-center justify-center w-9 h-9 rounded-full bg-[var(--card)] border border-[var(--br)] shadow-sm text-[var(--p1)] hover:border-[var(--p1)] disabled:opacity-30 disabled:pointer-events-none transition-opacity">
+                        <ChevronLeft class="h-5 w-5" />
+                    </button>
+                {/if}
 
-                <!-- Klassisk: Diagonal -->
-                <div class="bg-[var(--card)] rounded-2xl border border-[var(--br)] p-4">
-                    <p class="text-md font-bold text-[var(--p1)] mb-3">Klassisk: <span class="text-[var(--p2)] italic"> Diagonal </span> </p>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        <div class="rounded-xl overflow-hidden shadow-sm">
-                            <button type="button" class="aspect-video relative w-full block group" on:click={() => activateVideo("Z2oNfG4eulQ")}>
-                                {#if activeVideos.has("Z2oNfG4eulQ")}
-                                    <iframe class="w-full h-full" src="https://www.youtube.com/embed/Z2oNfG4eulQ?autoplay=1" title="Diagonal" frameborder="0" allowfullscreen allow="autoplay"></iframe>
-                                {:else}
-                                    <img class="w-full h-full object-cover" src="https://img.youtube.com/vi/Z2oNfG4eulQ/hqdefault.jpg" alt="Diagonal" loading="lazy" />
-                                    <div class="absolute inset-0 flex items-center justify-center">
-                                        <svg viewBox="0 0 68 48" class="w-16 h-11 drop-shadow-lg group-hover:scale-110 transition-transform" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                            <rect width="68" height="48" rx="12" fill="#FF0000"/>
-                                            <polygon points="26,14 26,34 46,24" fill="white"/>
-                                        </svg>
-                                    </div>
-                                {/if}
-                            </button>
-                        </div>
-                        <div class="rounded-xl overflow-hidden shadow-sm">
-                            <button type="button" class="aspect-video relative w-full block group" on:click={() => activateVideo("NNR6YpFA7Jw")}>
-                                {#if activeVideos.has("NNR6YpFA7Jw")}
-                                    <iframe class="w-full h-full" src="https://www.youtube.com/embed/NNR6YpFA7Jw?autoplay=1" title="Diagonal 2" frameborder="0" allowfullscreen allow="autoplay"></iframe>
-                                {:else}
-                                    <img class="w-full h-full object-cover" src="https://img.youtube.com/vi/NNR6YpFA7Jw/hqdefault.jpg" alt="Diagonal 2" loading="lazy" />
-                                    <div class="absolute inset-0 flex items-center justify-center">
-                                        <svg viewBox="0 0 68 48" class="w-16 h-11 drop-shadow-lg group-hover:scale-110 transition-transform" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                            <rect width="68" height="48" rx="12" fill="#FF0000"/>
-                                            <polygon points="26,14 26,34 46,24" fill="white"/>
-                                        </svg>
-                                    </div>
-                                {/if}
-                            </button>
-                        </div>
+                <div class="flex-1 min-w-0">
+                    <!-- Horisontal karusell: én video av gangen, bla sidelengs -->
+                    <div bind:this={teknikkScrollEl} on:scroll={onTeknikkScroll}
+                        class="no-scrollbar flex overflow-x-auto snap-x snap-mandatory scroll-smooth">
+                        {#each teknikkVideoer as video, i (video.url + i)}
+                            <div class="snap-center shrink-0 w-full">
+                                <p class="text-md font-bold text-[var(--p1)] mb-3">
+                                    {video.stilart} <span class="text-[var(--p2)] italic"> - {video.teknikk} </span>
+                                </p>
+                                <div class="rounded-xl overflow-hidden">
+                                    <button type="button" class="aspect-video relative w-full block group" on:click={() => activateVideo(video.url)}>
+                                        {#if activeVideos.has(video.url)}
+                                            <iframe class="w-full h-full" src="https://www.youtube.com/embed/{video.url}?autoplay=1" title={video.teknikk} frameborder="0" allowfullscreen allow="autoplay"></iframe>
+                                        {:else}
+                                            <img class="w-full h-full object-cover" src="https://img.youtube.com/vi/{video.url}/hqdefault.jpg" alt={video.teknikk} loading="lazy" />
+                                            <div class="absolute inset-0 flex items-center justify-center">
+                                                <svg viewBox="0 0 68 48" class="w-16 h-11 drop-shadow-lg group-hover:scale-110 transition-transform" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                    <rect width="68" height="48" rx="12" fill="#FF0000"/>
+                                                    <polygon points="26,14 26,34 46,24" fill="white"/>
+                                                </svg>
+                                            </div>
+                                        {/if}
+                                    </button>
+                                </div>
+                            </div>
+                        {/each}
                     </div>
                 </div>
 
-                <!-- Klassisk: Staking -->
-                <div class="bg-[var(--card)] rounded-2xl border border-[var(--br)] p-4">
-                    <p class="text-md font-bold text-[var(--p1)] mb-3">Klassisk: <span class="text-[var(--p2)] italic"> Staking </span></p>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        <div class="rounded-xl overflow-hidden shadow-sm">
-                            <button type="button" class="aspect-video relative w-full block group" on:click={() => activateVideo("D_hlp-buPhA")}>
-                                {#if activeVideos.has("D_hlp-buPhA")}
-                                    <iframe class="w-full h-full" src="https://www.youtube.com/embed/D_hlp-buPhA?autoplay=1" title="Staking" frameborder="0" allowfullscreen allow="autoplay"></iframe>
-                                {:else}
-                                    <img class="w-full h-full object-cover" src="https://img.youtube.com/vi/D_hlp-buPhA/hqdefault.jpg" alt="Staking" loading="lazy" />
-                                    <div class="absolute inset-0 flex items-center justify-center">
-                                        <svg viewBox="0 0 68 48" class="w-16 h-11 drop-shadow-lg group-hover:scale-110 transition-transform" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                            <rect width="68" height="48" rx="12" fill="#FF0000"/>
-                                            <polygon points="26,14 26,34 46,24" fill="white"/>
-                                        </svg>
-                                    </div>
-                                {/if}
-                            </button>
-                        </div>
-                        <div class="rounded-xl overflow-hidden shadow-sm">
-                            <button type="button" class="aspect-video relative w-full block group" on:click={() => activateVideo("MYVK4agNPcE")}>
-                                {#if activeVideos.has("MYVK4agNPcE")}
-                                    <iframe class="w-full h-full" src="https://www.youtube.com/embed/MYVK4agNPcE?autoplay=1" title="Staking 2" frameborder="0" allowfullscreen allow="autoplay"></iframe>
-                                {:else}
-                                    <img class="w-full h-full object-cover" src="https://img.youtube.com/vi/MYVK4agNPcE/hqdefault.jpg" alt="Staking 2" loading="lazy" />
-                                    <div class="absolute inset-0 flex items-center justify-center">
-                                        <svg viewBox="0 0 68 48" class="w-16 h-11 drop-shadow-lg group-hover:scale-110 transition-transform" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                            <rect width="68" height="48" rx="12" fill="#FF0000"/>
-                                            <polygon points="26,14 26,34 46,24" fill="white"/>
-                                        </svg>
-                                    </div>
-                                {/if}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Klassisk: Dobbeltak med fraspark -->
-                <div class="bg-[var(--card)] rounded-2xl border border-[var(--br)] p-4">
-                    <p class="text-md font-bold text-[var(--p1)] mb-3">Klassisk: <span class="text-[var(--p2)] italic"> Dobbeltak med fraspark </span></p>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        <div class="rounded-xl overflow-hidden shadow-sm">
-                            <button type="button" class="aspect-video relative w-full block group" on:click={() => activateVideo("7SZn1vDG_WY")}>
-                                {#if activeVideos.has("7SZn1vDG_WY")}
-                                    <iframe class="w-full h-full" src="https://www.youtube.com/embed/7SZn1vDG_WY?autoplay=1" title="Dobbeltak" frameborder="0" allowfullscreen allow="autoplay"></iframe>
-                                {:else}
-                                    <img class="w-full h-full object-cover" src="https://img.youtube.com/vi/7SZn1vDG_WY/hqdefault.jpg" alt="Dobbeltak med fraspark" loading="lazy" />
-                                    <div class="absolute inset-0 flex items-center justify-center">
-                                        <svg viewBox="0 0 68 48" class="w-16 h-11 drop-shadow-lg group-hover:scale-110 transition-transform" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                            <rect width="68" height="48" rx="12" fill="#FF0000"/>
-                                            <polygon points="26,14 26,34 46,24" fill="white"/>
-                                        </svg>
-                                    </div>
-                                {/if}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Skøyting: Dobbeldans -->
-                <div class="bg-[var(--card)] rounded-2xl border border-[var(--br)] p-4">
-                    <p class="text-md font-bold text-[var(--p1)] mb-3">Skøyting: <span class="text-[var(--p2)] italic"> Dobbeldans </span></p>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        <div class="rounded-xl overflow-hidden shadow-sm">
-                            <button type="button" class="aspect-video relative w-full block group" on:click={() => activateVideo("PlFkOEr7bw0")}>
-                                {#if activeVideos.has("PlFkOEr7bw0")}
-                                    <iframe class="w-full h-full" src="https://www.youtube.com/embed/PlFkOEr7bw0?autoplay=1" title="Dobbeldans" frameborder="0" allowfullscreen allow="autoplay"></iframe>
-                                {:else}
-                                    <img class="w-full h-full object-cover" src="https://img.youtube.com/vi/PlFkOEr7bw0/hqdefault.jpg" alt="Dobbeldans" loading="lazy" />
-                                    <div class="absolute inset-0 flex items-center justify-center">
-                                        <svg viewBox="0 0 68 48" class="w-16 h-11 drop-shadow-lg group-hover:scale-110 transition-transform" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                            <rect width="68" height="48" rx="12" fill="#FF0000"/>
-                                            <polygon points="26,14 26,34 46,24" fill="white"/>
-                                        </svg>
-                                    </div>
-                                {/if}
-                            </button>
-                        </div>
-                        <div class="rounded-xl overflow-hidden shadow-sm">
-                            <button type="button" class="aspect-video relative w-full block group" on:click={() => activateVideo("G-vIb6gzYRk")}>
-                                {#if activeVideos.has("G-vIb6gzYRk")}
-                                    <iframe class="w-full h-full" src="https://www.youtube.com/embed/G-vIb6gzYRk?autoplay=1" title="Dobbeldans 2" frameborder="0" allowfullscreen allow="autoplay"></iframe>
-                                {:else}
-                                    <img class="w-full h-full object-cover" src="https://img.youtube.com/vi/G-vIb6gzYRk/hqdefault.jpg" alt="Dobbeldans 2" loading="lazy" />
-                                    <div class="absolute inset-0 flex items-center justify-center">
-                                        <svg viewBox="0 0 68 48" class="w-16 h-11 drop-shadow-lg group-hover:scale-110 transition-transform" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                            <rect width="68" height="48" rx="12" fill="#FF0000"/>
-                                            <polygon points="26,14 26,34 46,24" fill="white"/>
-                                        </svg>
-                                    </div>
-                                {/if}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Skøyting: Padling -->
-                <div class="bg-[var(--card)] rounded-2xl border border-[var(--br)] p-4">
-                    <p class="text-md font-bold text-[var(--p1)] mb-3">Skøyting: <span class="text-[var(--p2)] italic"> Padling </span></p>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        <div class="rounded-xl overflow-hidden shadow-sm">
-                            <button type="button" class="aspect-video relative w-full block group" on:click={() => activateVideo("Z6ynMU7KixA")}>
-                                {#if activeVideos.has("Z6ynMU7KixA")}
-                                    <iframe class="w-full h-full" src="https://www.youtube.com/embed/Z6ynMU7KixA?autoplay=1" title="Padling" frameborder="0" allowfullscreen allow="autoplay"></iframe>
-                                {:else}
-                                    <img class="w-full h-full object-cover" src="https://img.youtube.com/vi/Z6ynMU7KixA/hqdefault.jpg" alt="Padling" loading="lazy" />
-                                    <div class="absolute inset-0 flex items-center justify-center">
-                                        <svg viewBox="0 0 68 48" class="w-16 h-11 drop-shadow-lg group-hover:scale-110 transition-transform" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                            <rect width="68" height="48" rx="12" fill="#FF0000"/>
-                                            <polygon points="26,14 26,34 46,24" fill="white"/>
-                                        </svg>
-                                    </div>
-                                {/if}
-                            </button>
-                        </div>
-                        <div class="rounded-xl overflow-hidden shadow-sm">
-                            <button type="button" class="aspect-video relative w-full block group" on:click={() => activateVideo("-eWpFQ9rDos")}>
-                                {#if activeVideos.has("-eWpFQ9rDos")}
-                                    <iframe class="w-full h-full" src="https://www.youtube.com/embed/-eWpFQ9rDos?autoplay=1" title="Padling 2" frameborder="0" allowfullscreen allow="autoplay"></iframe>
-                                {:else}
-                                    <img class="w-full h-full object-cover" src="https://img.youtube.com/vi/-eWpFQ9rDos/hqdefault.jpg" alt="Padling 2" loading="lazy" />
-                                    <div class="absolute inset-0 flex items-center justify-center">
-                                        <svg viewBox="0 0 68 48" class="w-16 h-11 drop-shadow-lg group-hover:scale-110 transition-transform" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                            <rect width="68" height="48" rx="12" fill="#FF0000"/>
-                                            <polygon points="26,14 26,34 46,24" fill="white"/>
-                                        </svg>
-                                    </div>
-                                {/if}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Skøyting: Enkeldans -->
-                <div class="bg-[var(--card)] rounded-2xl border border-[var(--br)] p-4">
-                    <p class="text-md font-bold text-[var(--p1)] mb-3">Skøyting: <span class="text-[var(--p2)] italic"> Enkeldans </span></p>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        <div class="rounded-xl overflow-hidden shadow-sm">
-                            <button type="button" class="aspect-video relative w-full block group" on:click={() => activateVideo("8PLC-KWs4c0")}>
-                                {#if activeVideos.has("8PLC-KWs4c0")}
-                                    <iframe class="w-full h-full" src="https://www.youtube.com/embed/8PLC-KWs4c0?autoplay=1" title="Enkeldans" frameborder="0" allowfullscreen allow="autoplay"></iframe>
-                                {:else}
-                                    <img class="w-full h-full object-cover" src="https://img.youtube.com/vi/8PLC-KWs4c0/hqdefault.jpg" alt="Enkeldans" loading="lazy" />
-                                    <div class="absolute inset-0 flex items-center justify-center">
-                                        <svg viewBox="0 0 68 48" class="w-16 h-11 drop-shadow-lg group-hover:scale-110 transition-transform" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                            <rect width="68" height="48" rx="12" fill="#FF0000"/>
-                                            <polygon points="26,14 26,34 46,24" fill="white"/>
-                                        </svg>
-                                    </div>
-                                {/if}
-                            </button>
-                        </div>
-                        <div class="rounded-xl overflow-hidden shadow-sm">
-                            <button type="button" class="aspect-video relative w-full block group" on:click={() => activateVideo("QWZp2WVukkY")}>
-                                {#if activeVideos.has("QWZp2WVukkY")}
-                                    <iframe class="w-full h-full" src="https://www.youtube.com/embed/QWZp2WVukkY?autoplay=1" title="Enkeldans 2" frameborder="0" allowfullscreen allow="autoplay"></iframe>
-                                {:else}
-                                    <img class="w-full h-full object-cover" src="https://img.youtube.com/vi/QWZp2WVukkY/hqdefault.jpg" alt="Enkeldans 2" loading="lazy" />
-                                    <div class="absolute inset-0 flex items-center justify-center">
-                                        <svg viewBox="0 0 68 48" class="w-16 h-11 drop-shadow-lg group-hover:scale-110 transition-transform" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                            <rect width="68" height="48" rx="12" fill="#FF0000"/>
-                                            <polygon points="26,14 26,34 46,24" fill="white"/>
-                                        </svg>
-                                    </div>
-                                {/if}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
+                
+                {#if teknikkVideoer.length > 1}
+                    <button type="button" on:click={teknikkNeste} disabled={teknikkAktivIndeks === teknikkVideoer.length - 1}
+                        aria-label="Neste video"
+                        class="hidden sm:flex flex-shrink-0 items-center justify-center w-9 h-9 rounded-full bg-[var(--card)] border border-[var(--br)] shadow-sm text-[var(--p1)] hover:border-[var(--p1)] disabled:opacity-30 disabled:pointer-events-none transition-opacity">
+                        <ChevronRight class="h-5 w-5" />
+                    </button>
+                {/if}
             </div>
+
+            {#if teknikkVideoer.length > 1}
+                <!-- Punkt-indikatorer -->
+                <div class="flex justify-center items-center gap-1.5 mt-3">
+                    {#each teknikkVideoer as _, i}
+                        <button type="button" on:click={() => scrollTeknikkTil(i)}
+                            aria-label={`Gå til video ${i + 1}`}
+                            class="h-2 rounded-full transition-all {i === teknikkAktivIndeks ? 'w-5 bg-[var(--p1)]' : 'w-2 bg-[var(--br)]'}">
+                        </button>
+                    {/each}
+                </div>
+            {/if}
         </section>
 
         <div class="h-6"></div>
